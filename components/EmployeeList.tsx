@@ -13,13 +13,12 @@ import {
   useReactTable,
   VisibilityState,
 } from "@tanstack/react-table"
-import { ArrowUpDown, ChevronDown, MoreHorizontal } from "lucide-react"
+import { ArrowUpDown, MoreHorizontal } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -35,48 +34,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { LinkedinCompanyInput } from "@/components/LinkedinCompanyInput"
+import type { FilteredEmployee } from "@/lib/types/apify"
+import { useEmployees } from "@/hooks/use-employees"
 
-const data: Payment[] = [
-  {
-    id: "m5gr84i9",
-    amount: 316,
-    status: "success",
-    email: "ken99@example.com",
-  },
-  {
-    id: "3u1reuv4",
-    amount: 242,
-    status: "success",
-    email: "Abe45@example.com",
-  },
-  {
-    id: "derv1ws0",
-    amount: 837,
-    status: "processing",
-    email: "Monserrat44@example.com",
-  },
-  {
-    id: "5kma53ae",
-    amount: 874,
-    status: "success",
-    email: "Silas22@example.com",
-  },
-  {
-    id: "bhqecj4p",
-    amount: 721,
-    status: "failed",
-    email: "carmella@example.com",
-  },
-]
-
-export type Payment = {
-  id: string
-  amount: number
-  status: "pending" | "processing" | "success" | "failed"
-  email: string
-}
-
-export const columns: ColumnDef<Payment>[] = [
+export const columns: ColumnDef<FilteredEmployee>[] = [
   {
     id: "select",
     header: ({ table }) => (
@@ -100,41 +62,77 @@ export const columns: ColumnDef<Payment>[] = [
     enableHiding: false,
   },
   {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => (
-      <div className="capitalize">{row.getValue("status")}</div>
+    id: "name",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Name
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
     ),
-  },
-  {
-    accessorKey: "email",
-    header: ({ column }) => {
+    accessorFn: (row) => `${row.firstName} ${row.lastName}`.trim(),
+    cell: ({ row }) => {
+      const original = row.original
+      const fullName = `${original.firstName} ${original.lastName}`.trim()
       return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Email
-          <ArrowUpDown />
-        </Button>
+        <div className="font-medium">
+          {fullName || "Unknown"}
+        </div>
       )
     },
-    cell: ({ row }) => <div className="lowercase">{row.getValue("email")}</div>,
   },
   {
-    accessorKey: "amount",
-    header: () => <div className="text-right">Salary</div>,
+    accessorKey: "currentTitle",
+    header: "Role",
     cell: ({ row }) => {
-      const amount = parseFloat(row.getValue("amount"))
-
-      // Format the amount as a dollar amount
-      const formatted = new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-      }).format(amount)
-
-      return <div className="text-right font-medium">{formatted}</div>
+      const title = row.original.currentTitle
+      return <div className="text-sm text-muted-foreground">{title ?? "—"}</div>
     },
+  },
+  {
+    id: "startDate",
+    header: () => <div className="text-right pr-4">Start Date</div>,
+    accessorFn: (row) => {
+      if (!row.currentStartMonth || !row.currentStartYear) return ""
+      return `${row.currentStartMonth.toString().padStart(2, "0")}/${row.currentStartYear}`
+    },
+    cell: ({ row }) => {
+      const { currentStartMonth, currentStartYear } = row.original
+
+      if (!currentStartYear) {
+        return <div className="text-right text-sm text-muted-foreground">—</div>
+      }
+
+      const month =
+        typeof currentStartMonth === "number" && currentStartMonth >= 1 && currentStartMonth <= 12
+          ? new Date(2000, currentStartMonth - 1, 1).toLocaleString("en-US", {
+              month: "short",
+            })
+          : ""
+
+      return (
+        <div className="text-right text-sm pr-4">
+          {month ? `${month} ${currentStartYear}` : currentStartYear}
+        </div>
+      )
+    },
+  },
+  {
+    id: "salary",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        className="pl-4"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Salary
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    accessorFn: () => "",
+    cell: () => <div className="text-sm text-muted-foreground">—</div>,
   },
   {
     id: "actions",
@@ -152,13 +150,16 @@ export const columns: ColumnDef<Payment>[] = [
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem
-              onClick={() => navigator.clipboard.writeText(payment.id)}
+              onClick={() =>
+                navigator.clipboard.writeText(
+                  `${payment.firstName ?? ""} ${payment.lastName ?? ""}`.trim()
+                )
+              }
             >
-              Copy payment ID
+              Copy name
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>View customer</DropdownMenuItem>
-            <DropdownMenuItem>View payment details</DropdownMenuItem>
+            <DropdownMenuItem>View LinkedIn profile</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       )
@@ -174,9 +175,10 @@ export function DataTableDemo() {
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState({})
+  const { employees, loading, error, fetchByCompanyUrl } = useEmployees()
 
   const table = useReactTable({
-    data,
+    data: employees,
     columns,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
@@ -194,18 +196,23 @@ export function DataTableDemo() {
     },
   })
 
+  const hasEmployees = employees.length > 0
+
   return (
     <div className="w-full">
-      <div className="flex items-center py-4">
-        <Input
-          placeholder="Filter emails..."
-          value={(table.getColumn("email")?.getFilterValue() as string) ?? ""}
-          onChange={(event) =>
-            table.getColumn("email")?.setFilterValue(event.target.value)
-          }
-          className="max-w-sm"
-        />
-      </div>
+      {hasEmployees && (
+        <div className="flex items-center py-4">
+          <Input
+            placeholder="Filter by name..."
+            value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
+            onChange={(event) =>
+              table.getColumn("name")?.setFilterValue(event.target.value)
+            }
+            className="max-w-sm"
+          />
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-md border">
         <Table>
           <TableHeader>
@@ -247,39 +254,63 @@ export function DataTableDemo() {
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="h-24 text-center"
+                  className="h-64 align-middle"
                 >
-                  No results.
+                  {hasEmployees ? (
+                    <div className="text-center text-sm text-muted-foreground">
+                      No results.
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center gap-4 py-4">
+                      <p className="text-sm text-muted-foreground">
+                        Populate the table from your company's LinkedIn profile.
+                      </p>
+                      <div className="w-full max-w-xl">
+                        <LinkedinCompanyInput
+                          onSubmit={fetchByCompanyUrl}
+                          loading={loading}
+                        />
+                      </div>
+                      {error && (
+                        <p className="text-sm text-destructive">
+                          {error}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-end space-x-2 py-4">
-        <div className="text-muted-foreground flex-1 text-sm">
-          {table.getFilteredSelectedRowModel().rows.length} of{" "}
-          {table.getFilteredRowModel().rows.length} row(s) selected.
+
+      {hasEmployees && (
+        <div className="flex items-center justify-end space-x-2 py-4">
+          <div className="text-muted-foreground flex-1 text-sm">
+            {table.getFilteredSelectedRowModel().rows.length} of{" "}
+            {table.getFilteredRowModel().rows.length} row(s) selected.
+          </div>
+          <div className="space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+            >
+              Next
+            </Button>
+          </div>
         </div>
-        <div className="space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-          >
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-          >
-            Next
-          </Button>
-        </div>
-      </div>
+      )}
     </div>
   )
 }
