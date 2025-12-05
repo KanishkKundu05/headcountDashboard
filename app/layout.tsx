@@ -32,7 +32,7 @@ export default function RootLayout({
         <SidebarProvider>
           <AppSidebar />
           <SidebarInset>
-            <header className="flex h-16 items-center gap-4 border-b px-6">
+            <header className="flex h-[4.25rem] items-center gap-4 border-b px-4">
               <SidebarTrigger />
               <h1 className="text-lg font-semibold">Welcome</h1>
             </header>

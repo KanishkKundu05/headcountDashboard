@@ -19,7 +19,7 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader>
-        <div className="p-4 font-semibold border-b text-lg">Headcount</div>
+        <div className="px-2 py-4 font-semibold border-b text-lg">Headcount</div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
