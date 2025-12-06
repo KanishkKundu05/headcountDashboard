@@ -47,9 +47,15 @@ export default function SignInPage() {
       await signIn("password", formData);
       router.push("/");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Authentication failed. Please try again."
-      );
+      const message = err instanceof Error ? err.message : "";
+      if (message.includes("already exists")) {
+        setError("An account with this email already exists. Please sign in instead.");
+        setFlow("signIn");
+      } else if (message.includes("Invalid password") || message.includes("Could not verify")) {
+        setError("Invalid email or password.");
+      } else {
+        setError("Authentication failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
