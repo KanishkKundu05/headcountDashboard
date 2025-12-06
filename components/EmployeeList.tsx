@@ -16,7 +16,7 @@ import {
   useReactTable,
   VisibilityState,
 } from "@tanstack/react-table"
-import { ArrowUpDown, MoreHorizontal, Trash2, UserMinus } from "lucide-react"
+import { ArrowUpDown, MoreHorizontal, Trash2, UserMinus, Plus, Copy, Link, ChevronDown } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -40,6 +40,7 @@ import {
 import { LinkedinCompanyInput } from "@/components/LinkedinCompanyInput"
 import { useCurrentScenario } from "@/hooks/use-current-scenario"
 import { Skeleton } from "@/components/ui/skeleton"
+import { EditableCell } from "@/components/editable-cell"
 
 // Employee type from Convex
 interface Employee {
@@ -79,7 +80,15 @@ export function DataTableDemo() {
     api.scenarios.getScenarioWithEmployees,
     currentScenarioId ? { id: currentScenarioId } : "skip"
   )
+  const linkedinScrapes = useQuery(api.scenarios.getLinkedinScrapes)
+
   const createScenarioFromLinkedIn = useMutation(api.scenarios.createScenarioFromLinkedIn)
+  const addEmployeesFromLinkedIn = useMutation(api.scenarios.addEmployeesFromLinkedIn)
+  const addEmployeesToScenario = useMutation(api.scenarios.addEmployeesToScenario)
+  const copyEmployeesFromScenario = useMutation(api.scenarios.copyEmployeesFromScenario)
+  const createEmployee = useMutation(api.employees.createEmployee)
+  const addEmployeeToScenario = useMutation(api.scenarios.addEmployeeToScenario)
+  const updateEmployee = useMutation(api.employees.updateEmployee)
   const deleteEmployee = useMutation(api.employees.deleteEmployee)
   const removeEmployeeFromScenario = useMutation(api.scenarios.removeEmployeeFromScenario)
 
@@ -89,6 +98,7 @@ export function DataTableDemo() {
   const [rowSelection, setRowSelection] = React.useState({})
   const [linkedInLoading, setLinkedInLoading] = React.useState(false)
   const [linkedInError, setLinkedInError] = React.useState<string | null>(null)
+  const [showLinkedInInput, setShowLinkedInInput] = React.useState(false)
 
   // Auto-select first scenario if none selected
   React.useEffect(() => {
@@ -102,7 +112,13 @@ export function DataTableDemo() {
   const hasScenarios = scenarios && scenarios.length > 0
   const hasEmployees = employees.length > 0
 
-  // Handle LinkedIn import - creates a new scenario
+  // Derived state for empty state layout
+  const otherScenarios = scenarios?.filter((s) => s._id !== currentScenarioId) ?? []
+  const hasOtherScenarios = otherScenarios.length > 0
+  const hasScrapeHistory = linkedinScrapes && linkedinScrapes.length > 0
+  const isFirstTimeUser = !hasOtherScenarios && !hasScrapeHistory
+
+  // Handle LinkedIn import - creates a new scenario (for first-time users)
   const handleLinkedInSubmit = async (companyUrl: string) => {
     try {
       setLinkedInLoading(true)
@@ -124,9 +140,10 @@ export function DataTableDemo() {
       const companySlug = urlParts[urlParts.length - 1] || urlParts[urlParts.length - 2] || "New Scenario"
       const scenarioName = companySlug.charAt(0).toUpperCase() + companySlug.slice(1)
 
-      // Create scenario with employees
+      // Create scenario with employees and scrape record
       const result = await createScenarioFromLinkedIn({
         name: scenarioName,
+        companyUrl,
         employees: fetchedEmployees.map((emp: { firstName?: string; lastName?: string; pictureUrl?: string; currentTitle?: string; currentStartMonth?: number | null; currentStartYear?: number | null }) => ({
           firstName: emp.firstName,
           lastName: emp.lastName,
@@ -146,6 +163,87 @@ export function DataTableDemo() {
     }
   }
 
+  // Handle LinkedIn import to existing scenario
+  const handleLinkedInImportToScenario = async (companyUrl: string) => {
+    if (!currentScenarioId) return
+
+    try {
+      setLinkedInLoading(true)
+      setLinkedInError(null)
+
+      const response = await fetch(
+        `/api/employees?companyUrl=${encodeURIComponent(companyUrl)}`
+      )
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to load employees")
+      }
+
+      const fetchedEmployees = Array.isArray(data.employees) ? data.employees : []
+
+      // Extract company name from URL
+      const urlParts = companyUrl.split("/")
+      const companySlug = urlParts[urlParts.length - 1] || urlParts[urlParts.length - 2] || "LinkedIn Import"
+      const companyName = companySlug.charAt(0).toUpperCase() + companySlug.slice(1)
+
+      // Add employees to current scenario and create scrape record
+      await addEmployeesFromLinkedIn({
+        scenarioId: currentScenarioId,
+        companyName,
+        companyUrl,
+        employees: fetchedEmployees.map((emp: { firstName?: string; lastName?: string; pictureUrl?: string; currentTitle?: string; currentStartMonth?: number | null; currentStartYear?: number | null }) => ({
+          firstName: emp.firstName,
+          lastName: emp.lastName,
+          pictureUrl: emp.pictureUrl,
+          position: emp.currentTitle,
+          startMonth: emp.currentStartMonth ?? undefined,
+          startYear: emp.currentStartYear ?? undefined,
+        })),
+      })
+
+      setShowLinkedInInput(false)
+    } catch (error) {
+      setLinkedInError(error instanceof Error ? error.message : "Failed to import")
+    } finally {
+      setLinkedInLoading(false)
+    }
+  }
+
+  // Handle populate from scrape history
+  const handlePopulateFromScrape = async (scrapeId: Id<"linkedinScrapes">) => {
+    if (!currentScenarioId || !linkedinScrapes) return
+
+    const scrape = linkedinScrapes.find((s) => s._id === scrapeId)
+    if (!scrape) return
+
+    await addEmployeesToScenario({
+      scenarioId: currentScenarioId,
+      employeeIds: scrape.employeeIds,
+    })
+  }
+
+  // Handle copy from another scenario
+  const handleCopyFromScenario = async (sourceScenarioId: Id<"scenarios">) => {
+    if (!currentScenarioId) return
+
+    await copyEmployeesFromScenario({
+      targetScenarioId: currentScenarioId,
+      sourceScenarioId,
+    })
+  }
+
+  // Handle manually add employee
+  const handleManuallyAddEmployee = async () => {
+    if (!currentScenarioId) return
+
+    const employeeId = await createEmployee({})
+    await addEmployeeToScenario({
+      scenarioId: currentScenarioId,
+      employeeId,
+    })
+  }
+
   const handleDeleteEmployee = async (employeeId: Id<"employees">) => {
     await deleteEmployee({ id: employeeId })
   }
@@ -156,6 +254,45 @@ export function DataTableDemo() {
       scenarioId: currentScenarioId,
       employeeId,
     })
+  }
+
+  // Handle inline edit for employee fields
+  const handleUpdateEmployee = async (
+    employeeId: Id<"employees">,
+    field: string,
+    value: string
+  ) => {
+    if (field === "name") {
+      const [first, ...rest] = value.split(" ")
+      await updateEmployee({
+        id: employeeId,
+        firstName: first || undefined,
+        lastName: rest.join(" ") || undefined,
+      })
+    } else if (field === "position") {
+      await updateEmployee({
+        id: employeeId,
+        position: value || undefined,
+      })
+    } else if (field === "salary") {
+      const numValue = parseFloat(value)
+      await updateEmployee({
+        id: employeeId,
+        salary: isNaN(numValue) ? undefined : numValue,
+      })
+    } else if (field === "startDate") {
+      // Parse MM/YYYY format
+      const parts = value.split("/")
+      if (parts.length === 2) {
+        const month = parseInt(parts[0])
+        const year = parseInt(parts[1])
+        await updateEmployee({
+          id: employeeId,
+          startMonth: isNaN(month) ? undefined : month,
+          startYear: isNaN(year) ? undefined : year,
+        })
+      }
+    }
   }
 
   const columns: ColumnDef<Employee>[] = [
@@ -195,11 +332,15 @@ export function DataTableDemo() {
       accessorFn: (row) => getDisplayName(row),
       cell: ({ row }) => {
         const name = getDisplayName(row.original)
-        const isPlaceholder = !row.original.firstName && !row.original.lastName
         return (
-          <div className={`font-medium ${isPlaceholder ? "text-muted-foreground italic" : ""}`}>
-            {name}
-          </div>
+          <EditableCell
+            value={name === "TBD" ? "" : name}
+            onSave={async (val) => {
+              await handleUpdateEmployee(row.original._id, "name", val)
+            }}
+            placeholder="Enter name"
+            className="font-medium"
+          />
         )
       },
     },
@@ -207,36 +348,38 @@ export function DataTableDemo() {
       id: "position",
       header: "Role",
       accessorKey: "position",
-      cell: ({ row }) => {
-        const position = row.original.position
-        return <div className="text-sm text-muted-foreground">{position ?? "—"}</div>
-      },
+      cell: ({ row }) => (
+        <EditableCell
+          value={row.original.position ?? ""}
+          onSave={async (val) => {
+            await handleUpdateEmployee(row.original._id, "position", val)
+          }}
+          placeholder="Enter role"
+          className="text-sm"
+        />
+      ),
     },
     {
       id: "startDate",
-      header: () => <div className="text-right pr-4">Start Date</div>,
+      header: "Start Date",
       accessorFn: (row) => {
         if (!row.startMonth || !row.startYear) return ""
         return `${row.startMonth.toString().padStart(2, "0")}/${row.startYear}`
       },
       cell: ({ row }) => {
         const { startMonth, startYear } = row.original
-
-        if (!startYear) {
-          return <div className="text-right text-sm text-muted-foreground pr-4">—</div>
-        }
-
-        const month =
-          typeof startMonth === "number" && startMonth >= 1 && startMonth <= 12
-            ? new Date(2000, startMonth - 1, 1).toLocaleString("en-US", {
-                month: "short",
-              })
-            : ""
+        const dateValue = startMonth && startYear ? `${startMonth}/${startYear}` : ""
 
         return (
-          <div className="text-right text-sm pr-4">
-            {month ? `${month} ${startYear}` : startYear}
-          </div>
+          <EditableCell
+            value={dateValue}
+            onSave={async (val) => {
+              await handleUpdateEmployee(row.original._id, "startDate", val)
+            }}
+            placeholder="MM/YYYY"
+            className="text-sm"
+            clearOnEdit
+          />
         )
       },
     },
@@ -254,8 +397,16 @@ export function DataTableDemo() {
       ),
       accessorKey: "salary",
       cell: ({ row }) => (
-        <div className="text-sm text-muted-foreground pl-4">
-          {formatSalary(row.original.salary)}
+        <div className="pl-4">
+          <EditableCell
+            value={row.original.salary ?? ""}
+            onSave={async (val) => {
+              await handleUpdateEmployee(row.original._id, "salary", val)
+            }}
+            type="currency"
+            placeholder="Enter salary"
+            className="text-sm"
+          />
         </div>
       ),
     },
@@ -352,7 +503,7 @@ export function DataTableDemo() {
                 <TableHead className="w-12" />
                 <TableHead>Name</TableHead>
                 <TableHead>Role</TableHead>
-                <TableHead className="text-right">Start Date</TableHead>
+                <TableHead>Start Date</TableHead>
                 <TableHead>Salary</TableHead>
                 <TableHead className="w-12" />
               </TableRow>
@@ -435,8 +586,131 @@ export function DataTableDemo() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
-                  No employees in this scenario.
+                <TableCell colSpan={columns.length} className="h-64 align-middle">
+                  {isFirstTimeUser ? (
+                    // Layout A: First-time user - show LinkedIn input directly
+                    <div className="flex flex-col items-center justify-center gap-4 py-4">
+                      <div className="text-center space-y-1">
+                        <p className="text-sm font-medium">No employees in this scenario</p>
+                        <p className="text-sm text-muted-foreground">
+                          Import from LinkedIn or add employees manually
+                        </p>
+                      </div>
+                      <div className="w-full max-w-xl">
+                        <LinkedinCompanyInput
+                          onSubmit={handleLinkedInImportToScenario}
+                          loading={linkedInLoading}
+                        />
+                      </div>
+                      {linkedInError && (
+                        <p className="text-sm text-destructive">{linkedInError}</p>
+                      )}
+                      <div className="flex items-center gap-4 w-full max-w-xl">
+                        <div className="flex-1 h-px bg-border" />
+                        <span className="text-xs text-muted-foreground">or</span>
+                        <div className="flex-1 h-px bg-border" />
+                      </div>
+                      <Button variant="outline" onClick={handleManuallyAddEmployee}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Manually add employee
+                      </Button>
+                    </div>
+                  ) : showLinkedInInput ? (
+                    // LinkedIn input expanded state
+                    <div className="flex flex-col items-center justify-center gap-4 py-4">
+                      <div className="w-full max-w-xl">
+                        <LinkedinCompanyInput
+                          onSubmit={handleLinkedInImportToScenario}
+                          loading={linkedInLoading}
+                        />
+                      </div>
+                      {linkedInError && (
+                        <p className="text-sm text-destructive">{linkedInError}</p>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowLinkedInInput(false)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    // Layout B: Returning user - show all options
+                    <div className="flex flex-col items-center justify-center gap-3 py-4">
+                      <p className="text-sm font-medium mb-2">No employees in this scenario</p>
+
+                      {/* Copy from scenario dropdown */}
+                      {hasOtherScenarios && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="w-64">
+                              <Copy className="mr-2 h-4 w-4" />
+                              Copy from scenario
+                              <ChevronDown className="ml-auto h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="w-64">
+                            <DropdownMenuLabel>Select scenario</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {otherScenarios.map((scenario) => (
+                              <DropdownMenuItem
+                                key={scenario._id}
+                                onClick={() => handleCopyFromScenario(scenario._id)}
+                              >
+                                {scenario.name}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+
+                      {/* Populate from scrape */}
+                      {hasScrapeHistory && linkedinScrapes && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="w-64">
+                              <Link className="mr-2 h-4 w-4" />
+                              Populate from scrape
+                              <ChevronDown className="ml-auto h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="w-64">
+                            <DropdownMenuLabel>Select scrape</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {linkedinScrapes.map((scrape) => (
+                              <DropdownMenuItem
+                                key={scrape._id}
+                                onClick={() => handlePopulateFromScrape(scrape._id)}
+                              >
+                                {scrape.companyName}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+
+                      {/* Scrape new LinkedIn URL */}
+                      <Button
+                        variant="outline"
+                        className="w-64"
+                        onClick={() => setShowLinkedInInput(true)}
+                      >
+                        <Link className="mr-2 h-4 w-4" />
+                        Scrape new LinkedIn URL
+                      </Button>
+
+                      {/* Manually add */}
+                      <Button
+                        variant="outline"
+                        className="w-64"
+                        onClick={handleManuallyAddEmployee}
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Manually add employee
+                      </Button>
+                    </div>
+                  )}
                 </TableCell>
               </TableRow>
             )}
