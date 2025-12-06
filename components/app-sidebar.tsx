@@ -16,9 +16,11 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { NavUser } from "@/components/nav-user";
+import { ShareButton } from "@/components/share-button";
 import { Plus, FileText } from "lucide-react";
 import { useCurrentScenario } from "@/hooks/use-current-scenario";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
 
 export function AppSidebar() {
   const scenarios = useQuery(api.scenarios.getScenarios);
@@ -72,7 +74,11 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
+      <SidebarFooter className="gap-2">
+        <div className="px-2">
+          <ShareButton />
+        </div>
+        <Separator />
         {currentUser ? (
           <NavUser
             user={{
