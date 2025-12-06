@@ -127,13 +127,13 @@ export function DataTableDemo() {
       // Create scenario with employees
       const result = await createScenarioFromLinkedIn({
         name: scenarioName,
-        employees: fetchedEmployees.map((emp: { firstName?: string; lastName?: string; pictureUrl?: string; currentTitle?: string; currentStartMonth?: number; currentStartYear?: number }) => ({
+        employees: fetchedEmployees.map((emp: { firstName?: string; lastName?: string; pictureUrl?: string; currentTitle?: string; currentStartMonth?: number | null; currentStartYear?: number | null }) => ({
           firstName: emp.firstName,
           lastName: emp.lastName,
           pictureUrl: emp.pictureUrl,
           position: emp.currentTitle,
-          startMonth: emp.currentStartMonth,
-          startYear: emp.currentStartYear,
+          startMonth: emp.currentStartMonth ?? undefined,
+          startYear: emp.currentStartYear ?? undefined,
         })),
       })
 
@@ -316,6 +316,7 @@ export function DataTableDemo() {
     columns,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
+    autoResetPageIndex: false,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
