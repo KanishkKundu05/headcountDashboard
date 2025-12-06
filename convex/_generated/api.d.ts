@@ -12,6 +12,7 @@ import type * as auth from "../auth.js";
 import type * as employees from "../employees.js";
 import type * as http from "../http.js";
 import type * as scenarios from "../scenarios.js";
+import type * as sharedLinks from "../sharedLinks.js";
 import type * as users from "../users.js";
 
 import type {
@@ -25,6 +26,7 @@ declare const fullApi: ApiFromModules<{
   employees: typeof employees;
   http: typeof http;
   scenarios: typeof scenarios;
+  sharedLinks: typeof sharedLinks;
   users: typeof users;
 }>;
 
