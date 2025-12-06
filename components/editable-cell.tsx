@@ -125,7 +125,7 @@ export function EditableCell({
 
   if (editing) {
     return (
-      <div className="relative inline-flex items-center">
+      <div className={cn("relative inline-flex items-center -mx-2 -my-1", className)}>
         {/* Hidden span for measuring width */}
         <span
           ref={spanRef}
@@ -149,7 +149,7 @@ export function EditableCell({
           placeholder={placeholder}
           style={{ width: inputWidth ? `${inputWidth}px` : "auto" }}
           className={cn(
-            "h-8 px-2 py-1 text-sm border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent box-content hide-spinners",
+            "h-8 px-2 py-1 text-sm border-0 rounded shadow-none focus-visible:ring-0 bg-transparent hide-spinners",
             className
           )}
         />

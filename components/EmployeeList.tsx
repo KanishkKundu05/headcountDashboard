@@ -16,7 +16,7 @@ import {
   useReactTable,
   VisibilityState,
 } from "@tanstack/react-table"
-import { ArrowUpDown, MoreHorizontal, Trash2, UserMinus, Plus, Copy, Link, ChevronDown } from "lucide-react"
+import { ArrowUpDown, MoreHorizontal, Trash2, Plus, Copy, Link, ChevronDown } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -89,8 +89,8 @@ export function DataTableDemo() {
   const createEmployee = useMutation(api.employees.createEmployee)
   const addEmployeeToScenario = useMutation(api.scenarios.addEmployeeToScenario)
   const updateEmployee = useMutation(api.employees.updateEmployee)
-  const deleteEmployee = useMutation(api.employees.deleteEmployee)
   const removeEmployeeFromScenario = useMutation(api.scenarios.removeEmployeeFromScenario)
+  const removeEmployeesFromScenario = useMutation(api.scenarios.removeEmployeesFromScenario)
 
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
@@ -244,16 +244,33 @@ export function DataTableDemo() {
     })
   }
 
-  const handleDeleteEmployee = async (employeeId: Id<"employees">) => {
-    await deleteEmployee({ id: employeeId })
-  }
-
   const handleRemoveFromScenario = async (employeeId: Id<"employees">) => {
     if (!currentScenarioId) return
     await removeEmployeeFromScenario({
       scenarioId: currentScenarioId,
       employeeId,
     })
+  }
+
+  const handleClearAll = async () => {
+    if (!currentScenarioId) return
+    const employeeIds = employees.map(emp => emp._id)
+    await removeEmployeesFromScenario({
+      scenarioId: currentScenarioId,
+      employeeIds,
+    })
+    setRowSelection({})
+  }
+
+  const handleDeleteSelected = async () => {
+    if (!currentScenarioId) return
+    const selectedRows = table.getFilteredSelectedRowModel().rows
+    const employeeIds = selectedRows.map(row => row.original._id)
+    await removeEmployeesFromScenario({
+      scenarioId: currentScenarioId,
+      employeeIds,
+    })
+    setRowSelection({})
   }
 
   // Handle inline edit for employee fields
@@ -443,13 +460,6 @@ export function DataTableDemo() {
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => handleRemoveFromScenario(employee._id)}
-                className="text-orange-600"
-              >
-                <UserMinus className="mr-2 h-4 w-4" />
-                Remove from scenario
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => handleDeleteEmployee(employee._id)}
                 className="text-destructive"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
@@ -537,7 +547,7 @@ export function DataTableDemo() {
   return (
     <div className="w-full">
       {hasEmployees && (
-        <div className="flex items-center py-4">
+        <div className="flex items-center justify-between py-4">
           <Input
             placeholder="Filter by name..."
             value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
@@ -546,6 +556,24 @@ export function DataTableDemo() {
             }
             className="max-w-sm"
           />
+          <div className="flex items-center space-x-2">
+            {table.getFilteredSelectedRowModel().rows.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDeleteSelected}
+              >
+                Delete Selected ({table.getFilteredSelectedRowModel().rows.length})
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleClearAll}
+            >
+              Clear All
+            </Button>
+          </div>
         </div>
       )}
 
@@ -591,7 +619,6 @@ export function DataTableDemo() {
                     // Layout A: First-time user - show LinkedIn input directly
                     <div className="flex flex-col items-center justify-center gap-4 py-4">
                       <div className="text-center space-y-1">
-                        <p className="text-sm font-medium">No employees in this scenario</p>
                         <p className="text-sm text-muted-foreground">
                           Import from LinkedIn or add employees manually
                         </p>
