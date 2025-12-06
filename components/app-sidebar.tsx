@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
 import {
   Sidebar,
   SidebarContent,
@@ -13,12 +14,13 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { NavUser } from "@/components/nav-user";
 import { ShareButton } from "@/components/share-button";
-import { Plus, FileText } from "lucide-react";
+import { Plus, FileText, X } from "lucide-react";
 import { useCurrentScenario } from "@/hooks/use-current-scenario";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
@@ -28,6 +30,7 @@ export function AppSidebar() {
   const currentUser = useQuery(api.users.currentUser);
   const { currentScenarioId, setCurrentScenarioId } = useCurrentScenario();
   const createScenario = useMutation(api.scenarios.createScenario);
+  const deleteScenario = useMutation(api.scenarios.deleteScenario);
   const [isCreating, setIsCreating] = React.useState(false);
 
   const loading = scenarios === undefined;
@@ -56,6 +59,24 @@ export function AppSidebar() {
       console.error("Failed to create scenario:", error);
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleDeleteScenario = async (scenarioId: Id<"scenarios">) => {
+    try {
+      // If deleting the current scenario, switch to another one first
+      if (currentScenarioId === scenarioId) {
+        const remainingScenarios = scenarios?.filter((s) => s._id !== scenarioId);
+        if (remainingScenarios && remainingScenarios.length > 0) {
+          setCurrentScenarioId(remainingScenarios[0]._id);
+        } else {
+          setCurrentScenarioId(null);
+        }
+      }
+
+      await deleteScenario({ id: scenarioId });
+    } catch (error) {
+      console.error("Failed to delete scenario:", error);
     }
   };
 
@@ -96,6 +117,17 @@ export function AppSidebar() {
                       <FileText className="h-4 w-4" />
                       <span>{scenario.name}</span>
                     </SidebarMenuButton>
+                    <SidebarMenuAction
+                      showOnHover
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteScenario(scenario._id);
+                      }}
+                      title="Delete scenario"
+                      className="hover:text-destructive"
+                    >
+                      <X className="h-4 w-4" />
+                    </SidebarMenuAction>
                   </SidebarMenuItem>
                 ))
               ) : (

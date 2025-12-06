@@ -157,6 +157,33 @@ export const removeEmployeeFromScenario = mutation({
   },
 });
 
+// Remove multiple employees from a scenario at once
+export const removeEmployeesFromScenario = mutation({
+  args: {
+    scenarioId: v.id("scenarios"),
+    employeeIds: v.array(v.id("employees")),
+  },
+  handler: async (ctx, args) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const scenario = await ctx.db.get(args.scenarioId);
+    if (!scenario || scenario.userId !== userId) {
+      throw new Error("Scenario not found");
+    }
+
+    // Create a Set for O(1) lookup
+    const idsToRemove = new Set(args.employeeIds);
+
+    await ctx.db.patch(args.scenarioId, {
+      employeeIds: scenario.employeeIds.filter((id) => !idsToRemove.has(id)),
+      updatedAt: Date.now(),
+    });
+
+    return args.scenarioId;
+  },
+});
+
 // Create a scenario from LinkedIn import (bulk create employees + scenario + scrape record)
 export const createScenarioFromLinkedIn = mutation({
   args: {
