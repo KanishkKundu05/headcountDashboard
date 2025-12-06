@@ -37,4 +37,13 @@ export default defineSchema({
   })
     .index("by_token", ["token"])
     .index("by_user", ["userId"]),
+
+  // LinkedIn scrape history - track imported company data
+  linkedinScrapes: defineTable({
+    userId: v.id("users"),
+    companyName: v.string(),
+    companyUrl: v.string(),
+    employeeIds: v.array(v.id("employees")),
+    createdAt: v.number(),
+  }).index("by_user", ["userId"]),
 });

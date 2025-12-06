@@ -1,6 +1,7 @@
 "use client"
 
-import { useQuery } from "convex/react";
+import * as React from "react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import {
   Sidebar,
@@ -26,8 +27,37 @@ export function AppSidebar() {
   const scenarios = useQuery(api.scenarios.getScenarios);
   const currentUser = useQuery(api.users.currentUser);
   const { currentScenarioId, setCurrentScenarioId } = useCurrentScenario();
+  const createScenario = useMutation(api.scenarios.createScenario);
+  const [isCreating, setIsCreating] = React.useState(false);
 
   const loading = scenarios === undefined;
+
+  const handleCreateScenario = async () => {
+    if (isCreating) return;
+
+    setIsCreating(true);
+    try {
+      // Generate unique name based on existing scenarios
+      const baseName = "Untitled Scenario";
+      let name = baseName;
+      let counter = 1;
+
+      if (scenarios && scenarios.length > 0) {
+        const existingNames = new Set(scenarios.map((s) => s.name));
+        while (existingNames.has(name)) {
+          counter++;
+          name = `${baseName} ${counter}`;
+        }
+      }
+
+      const newScenarioId = await createScenario({ name });
+      setCurrentScenarioId(newScenarioId);
+    } catch (error) {
+      console.error("Failed to create scenario:", error);
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
   return (
     <Sidebar>
@@ -37,8 +67,13 @@ export function AppSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Scenarios</SidebarGroupLabel>
-          <SidebarGroupAction title="Create new scenario">
-            <Plus />
+          <SidebarGroupAction
+            title="Create new scenario"
+            onClick={handleCreateScenario}
+            disabled={isCreating}
+            className="cursor-pointer"
+          >
+            <Plus className={isCreating ? "animate-spin" : ""} />
           </SidebarGroupAction>
           <SidebarGroupContent>
             <SidebarMenu>

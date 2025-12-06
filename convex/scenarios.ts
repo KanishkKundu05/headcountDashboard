@@ -157,10 +157,11 @@ export const removeEmployeeFromScenario = mutation({
   },
 });
 
-// Create a scenario from LinkedIn import (bulk create employees + scenario)
+// Create a scenario from LinkedIn import (bulk create employees + scenario + scrape record)
 export const createScenarioFromLinkedIn = mutation({
   args: {
     name: v.string(),
+    companyUrl: v.optional(v.string()),
     employees: v.array(
       v.object({
         firstName: v.optional(v.string()),
@@ -198,6 +199,155 @@ export const createScenarioFromLinkedIn = mutation({
       updatedAt: now,
     });
 
+    // Create scrape history record if companyUrl provided
+    if (args.companyUrl) {
+      await ctx.db.insert("linkedinScrapes", {
+        userId,
+        companyName: args.name,
+        companyUrl: args.companyUrl,
+        employeeIds,
+        createdAt: now,
+      });
+    }
+
     return { scenarioId, employeeIds };
+  },
+});
+
+// Get LinkedIn scrape history for the current user
+export const getLinkedinScrapes = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) return [];
+
+    return await ctx.db
+      .query("linkedinScrapes")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .order("desc")
+      .collect();
+  },
+});
+
+// Add multiple employees to a scenario (for populate from scrape or copy)
+export const addEmployeesToScenario = mutation({
+  args: {
+    scenarioId: v.id("scenarios"),
+    employeeIds: v.array(v.id("employees")),
+  },
+  handler: async (ctx, args) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const scenario = await ctx.db.get(args.scenarioId);
+    if (!scenario || scenario.userId !== userId) {
+      throw new Error("Scenario not found");
+    }
+
+    // Filter out employees already in the scenario
+    const existingIds = new Set(scenario.employeeIds);
+    const newIds = args.employeeIds.filter((id) => !existingIds.has(id));
+
+    if (newIds.length > 0) {
+      await ctx.db.patch(args.scenarioId, {
+        employeeIds: [...scenario.employeeIds, ...newIds],
+        updatedAt: Date.now(),
+      });
+    }
+
+    return args.scenarioId;
+  },
+});
+
+// Add employees from LinkedIn import to an existing scenario
+export const addEmployeesFromLinkedIn = mutation({
+  args: {
+    scenarioId: v.id("scenarios"),
+    companyName: v.string(),
+    companyUrl: v.string(),
+    employees: v.array(
+      v.object({
+        firstName: v.optional(v.string()),
+        lastName: v.optional(v.string()),
+        pictureUrl: v.optional(v.string()),
+        position: v.optional(v.string()),
+        salary: v.optional(v.number()),
+        startMonth: v.optional(v.number()),
+        startYear: v.optional(v.number()),
+        linkedinUrl: v.optional(v.string()),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const scenario = await ctx.db.get(args.scenarioId);
+    if (!scenario || scenario.userId !== userId) {
+      throw new Error("Scenario not found");
+    }
+
+    // Create all employees
+    const employeeIds = await Promise.all(
+      args.employees.map((emp) =>
+        ctx.db.insert("employees", {
+          userId,
+          ...emp,
+        })
+      )
+    );
+
+    // Add employees to scenario
+    const now = Date.now();
+    await ctx.db.patch(args.scenarioId, {
+      employeeIds: [...scenario.employeeIds, ...employeeIds],
+      updatedAt: now,
+    });
+
+    // Create scrape history record
+    await ctx.db.insert("linkedinScrapes", {
+      userId,
+      companyName: args.companyName,
+      companyUrl: args.companyUrl,
+      employeeIds,
+      createdAt: now,
+    });
+
+    return { scenarioId: args.scenarioId, employeeIds };
+  },
+});
+
+// Copy employees from one scenario to another
+export const copyEmployeesFromScenario = mutation({
+  args: {
+    targetScenarioId: v.id("scenarios"),
+    sourceScenarioId: v.id("scenarios"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const targetScenario = await ctx.db.get(args.targetScenarioId);
+    if (!targetScenario || targetScenario.userId !== userId) {
+      throw new Error("Target scenario not found");
+    }
+
+    const sourceScenario = await ctx.db.get(args.sourceScenarioId);
+    if (!sourceScenario || sourceScenario.userId !== userId) {
+      throw new Error("Source scenario not found");
+    }
+
+    // Filter out employees already in target scenario
+    const existingIds = new Set(targetScenario.employeeIds);
+    const newIds = sourceScenario.employeeIds.filter((id) => !existingIds.has(id));
+
+    if (newIds.length > 0) {
+      await ctx.db.patch(args.targetScenarioId, {
+        employeeIds: [...targetScenario.employeeIds, ...newIds],
+        updatedAt: Date.now(),
+      });
+    }
+
+    return args.targetScenarioId;
   },
 });
