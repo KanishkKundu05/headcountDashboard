@@ -28,4 +28,13 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
+
+  // Shared links - allow public read-only access to user's scenarios
+  sharedLinks: defineTable({
+    userId: v.id("users"),
+    token: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_token", ["token"])
+    .index("by_user", ["userId"]),
 });
