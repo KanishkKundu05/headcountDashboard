@@ -27,6 +27,7 @@ export default defineSchema({
     employeeIds: v.array(v.id("employees")),
     createdAt: v.number(),
     updatedAt: v.number(),
+    isDefault: v.optional(v.boolean()),
   }).index("by_user", ["userId"]),
 
   // Shared links - allow public read-only access to user's scenarios

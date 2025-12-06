@@ -35,6 +35,17 @@ export function AppSidebar() {
 
   const loading = scenarios === undefined;
 
+  // Auto-create default scenario if none exist
+  React.useEffect(() => {
+    if (scenarios !== undefined && scenarios.length === 0) {
+      createScenario({
+        name: "My Scenario"
+      }).then((scenarioId) => {
+        setCurrentScenarioId(scenarioId)
+      })
+    }
+  }, [scenarios, createScenario, setCurrentScenarioId])
+
   const handleCreateScenario = async () => {
     if (isCreating) return;
 
@@ -117,17 +128,19 @@ export function AppSidebar() {
                       <FileText className="h-4 w-4" />
                       <span>{scenario.name}</span>
                     </SidebarMenuButton>
-                    <SidebarMenuAction
-                      showOnHover
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteScenario(scenario._id);
-                      }}
-                      title="Delete scenario"
-                      className="hover:text-destructive"
-                    >
-                      <X className="h-4 w-4" />
-                    </SidebarMenuAction>
+                    {scenarios.length > 1 && (
+                      <SidebarMenuAction
+                        showOnHover
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteScenario(scenario._id);
+                        }}
+                        title="Delete scenario"
+                        className="hover:text-destructive"
+                      >
+                        <X className="h-4 w-4" />
+                      </SidebarMenuAction>
+                    )}
                   </SidebarMenuItem>
                 ))
               ) : (

@@ -46,6 +46,7 @@ export const createScenario = mutation({
   args: {
     name: v.string(),
     employeeIds: v.optional(v.array(v.id("employees"))),
+    isDefault: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const userId = await auth.getUserId(ctx);
@@ -56,6 +57,7 @@ export const createScenario = mutation({
       userId,
       name: args.name,
       employeeIds: args.employeeIds ?? [],
+      isDefault: args.isDefault ?? false,
       createdAt: now,
       updatedAt: now,
     });
@@ -95,6 +97,16 @@ export const deleteScenario = mutation({
     const scenario = await ctx.db.get(args.id);
     if (!scenario || scenario.userId !== userId) {
       throw new Error("Scenario not found");
+    }
+
+    // Prevent deletion if this is the last scenario
+    const userScenarios = await ctx.db
+      .query("scenarios")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    if (userScenarios.length <= 1) {
+      throw new Error("Cannot delete the last scenario");
     }
 
     await ctx.db.delete(args.id);
