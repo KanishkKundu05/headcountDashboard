@@ -502,48 +502,6 @@ export function DataTableDemo() {
     )
   }
 
-  // Show empty state when no scenarios exist
-  if (!hasScenarios) {
-    return (
-      <div className="w-full">
-        <div className="overflow-hidden rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12" />
-                <TableHead>Name</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Start Date</TableHead>
-                <TableHead>Salary</TableHead>
-                <TableHead className="w-12" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow>
-                <TableCell colSpan={6} className="h-64 align-middle">
-                  <div className="flex flex-col items-center justify-center gap-4 py-4">
-                    <p className="text-sm text-muted-foreground">
-                      Create your first scenario by importing from LinkedIn.
-                    </p>
-                    <div className="w-full max-w-xl">
-                      <LinkedinCompanyInput
-                        onSubmit={handleLinkedInSubmit}
-                        loading={linkedInLoading}
-                      />
-                    </div>
-                    {linkedInError && (
-                      <p className="text-sm text-destructive">{linkedInError}</p>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="w-full">
       {hasEmployees && (
