@@ -165,7 +165,7 @@ export default function DashboardLayout({
       >
         <SidebarProvider>
           <AppSidebar />
-          <SidebarInset>
+          <SidebarInset className="overflow-x-hidden">
             <header className="flex h-[4.25rem] items-center justify-between gap-4 border-b px-4">
               <div className="flex items-center gap-4">
                 <SidebarTrigger />
@@ -187,7 +187,7 @@ export default function DashboardLayout({
                 />
               </div>
             </header>
-            <div className="flex flex-1 flex-col gap-4 p-4">
+            <div className="flex flex-1 flex-col gap-4 p-4 min-w-0">
               {children}
             </div>
           </SidebarInset>

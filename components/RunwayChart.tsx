@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
+import { CartesianGrid, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   ChartConfig,
@@ -68,6 +68,17 @@ export function RunwayChart({
     });
 
     return indices;
+  }, [data, useQuarterlyLabels]);
+
+  // Find the point where cash runs out (first point where cash <= 0)
+  const runoutPoint = React.useMemo(() => {
+    if (!data || data.length === 0) return null;
+    
+    const runoutIndex = data.findIndex((point) => point.cash <= 0);
+    if (runoutIndex === -1) return null;
+    
+    // Return the appropriate x-axis value based on label mode
+    return useQuarterlyLabels ? data[runoutIndex].quarter : data[runoutIndex].month;
   }, [data, useQuarterlyLabels]);
 
   const hasData = data && data.length > 0;
@@ -149,6 +160,21 @@ export function RunwayChart({
               dot={false}
               activeDot={{ r: 4 }}
             />
+            {/* Red dotted vertical line at runway end */}
+            {runoutPoint && (
+              <ReferenceLine
+                x={runoutPoint}
+                stroke="#ef4444"
+                strokeDasharray="4 4"
+                strokeWidth={2}
+                label={{
+                  value: "Runway End",
+                  position: "top",
+                  fill: "#ef4444",
+                  fontSize: 12,
+                }}
+              />
+            )}
           </LineChart>
         </ChartContainer>
 

@@ -824,10 +824,12 @@ export function DataTableDemo() {
         </>
       ) : (
         /* Timeline view */
-        <Timeline
-          employees={employees}
-          onUpdateEmployee={handleTimelineUpdate}
-        />
+        <div className="w-full overflow-hidden">
+          <Timeline
+            employees={employees}
+            onUpdateEmployee={handleTimelineUpdate}
+          />
+        </div>
       )}
     </div>
   )
