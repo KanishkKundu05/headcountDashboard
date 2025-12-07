@@ -20,6 +20,7 @@ import { ArrowUpDown, MoreHorizontal, Trash2, Plus, Copy, Link, ChevronDown } fr
 
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -52,6 +53,8 @@ interface Employee {
   salary?: number
   startMonth?: number
   startYear?: number
+  endMonth?: number
+  endYear?: number
   linkedinUrl?: string
 }
 
@@ -237,6 +240,9 @@ export function DataTableDemo() {
   const handleManuallyAddEmployee = async () => {
     if (!currentScenarioId) return
 
+    // Clear sorting to ensure the new employee (added to top) is visible at top
+    setSorting([])
+    
     const employeeId = await createEmployee({})
     await addEmployeeToScenario({
       scenarioId: currentScenarioId,
@@ -307,6 +313,24 @@ export function DataTableDemo() {
           id: employeeId,
           startMonth: isNaN(month) ? undefined : month,
           startYear: isNaN(year) ? undefined : year,
+        })
+      }
+    } else if (field === "endDate") {
+      // Parse MM/YYYY format
+      const parts = value.split("/")
+      if (parts.length === 2) {
+        const month = parseInt(parts[0])
+        const year = parseInt(parts[1])
+        await updateEmployee({
+          id: employeeId,
+          endMonth: isNaN(month) ? undefined : month,
+          endYear: isNaN(year) ? undefined : year,
+        })
+      } else if (value === "") {
+        await updateEmployee({
+          id: employeeId,
+          endMonth: undefined,
+          endYear: undefined,
         })
       }
     }
@@ -442,13 +466,31 @@ export function DataTableDemo() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={() =>
-                  navigator.clipboard.writeText(getDisplayName(employee))
-                }
-              >
-                Copy name
-              </DropdownMenuItem>
+              <div className="flex flex-col gap-1.5 p-2" onClick={(e) => e.stopPropagation()}>
+                <Label htmlFor={`end-date-${employee._id}`} className="text-xs font-normal text-muted-foreground">
+                  End Date (MM/YYYY)
+                </Label>
+                <Input
+                  id={`end-date-${employee._id}`}
+                  className="h-8 text-sm"
+                  placeholder="Indefinite"
+                  defaultValue={
+                    employee.endMonth && employee.endYear
+                      ? `${employee.endMonth.toString().padStart(2, "0")}/${employee.endYear}`
+                      : ""
+                  }
+                  onKeyDown={async (e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault()
+                      await handleUpdateEmployee(employee._id, "endDate", e.currentTarget.value)
+                      e.currentTarget.blur()
+                    }
+                  }}
+                  onBlur={async (e) => {
+                    await handleUpdateEmployee(employee._id, "endDate", e.target.value)
+                  }}
+                />
+              </div>
               {employee.linkedinUrl && (
                 <DropdownMenuItem
                   onClick={() => window.open(employee.linkedinUrl, "_blank")}
@@ -505,15 +547,19 @@ export function DataTableDemo() {
     <div className="w-full">
       {hasEmployees && (
         <div className="flex items-center justify-between py-4">
-          <Input
-            placeholder="Filter by name..."
-            value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
-            onChange={(event) =>
-              table.getColumn("name")?.setFilterValue(event.target.value)
-            }
-            className="max-w-sm"
-          />
+          <Button onClick={handleManuallyAddEmployee}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Role/Employee
+          </Button>
           <div className="flex items-center space-x-2">
+            <Input
+              placeholder="Filter by name..."
+              value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
+              onChange={(event) =>
+                table.getColumn("name")?.setFilterValue(event.target.value)
+              }
+              className="max-w-sm w-[200px]"
+            />
             {table.getFilteredSelectedRowModel().rows.length > 0 && (
               <Button
                 variant="outline"

@@ -136,7 +136,7 @@ export const addEmployeeToScenario = mutation({
 
     if (!scenario.employeeIds.includes(args.employeeId)) {
       await ctx.db.patch(args.scenarioId, {
-        employeeIds: [...scenario.employeeIds, args.employeeId],
+        employeeIds: [args.employeeId, ...scenario.employeeIds],
         updatedAt: Date.now(),
       });
     }

@@ -16,6 +16,8 @@ export default defineSchema({
     salary: v.optional(v.number()),
     startMonth: v.optional(v.number()),
     startYear: v.optional(v.number()),
+    endMonth: v.optional(v.number()),
+    endYear: v.optional(v.number()),
     linkedinUrl: v.optional(v.string()),
   }).index("by_user", ["userId"]),
 

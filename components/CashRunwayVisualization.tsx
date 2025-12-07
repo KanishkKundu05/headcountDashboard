@@ -20,8 +20,6 @@ export function CashRunwayVisualization() {
     currentScenarioId ? { id: currentScenarioId } : "skip"
   );
 
-  if (!currentScenarioId) return null;
-
   const updateScenarioFinancials = useMutation(
     api.scenarios.updateScenarioFinancials
   );
@@ -35,6 +33,8 @@ export function CashRunwayVisualization() {
       startingCashMonth: number | undefined,
       startingCashYear: number | undefined
     ) => {
+      if (!currentScenarioId) return;
+
       // Clear existing timeout
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -79,6 +79,9 @@ export function CashRunwayVisualization() {
       employees
     );
   }, [scenarioWithEmployees]);
+
+  // All conditional returns come AFTER all hooks
+  if (!currentScenarioId) return null;
 
   // Loading state
   if (!scenarioWithEmployees) {
