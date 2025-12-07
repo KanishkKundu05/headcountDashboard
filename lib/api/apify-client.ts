@@ -97,22 +97,27 @@ export function mapApifyEmployeesToFiltered(
   items: ApifyEmployeeItem[],
   companyUrl: string,
 ): FilteredEmployee[] {
-  return items.map((item) => {
-    const firstName = item.firstName ?? "";
-    const lastName = item.lastName ?? "";
-    const pictureUrl = item.pictureUrl ?? "";
+  return items
+    .map((item) => {
+      const firstName = item.firstName ?? "";
+      const lastName = item.lastName ?? "";
+      const pictureUrl = item.pictureUrl ?? "";
 
-    const position = resolveCurrentPositionForCompany(item, companyUrl);
+      const position = resolveCurrentPositionForCompany(item, companyUrl);
 
-    return {
-      firstName,
-      lastName,
-      pictureUrl,
-      currentTitle: position?.title ?? null,
-      currentStartMonth: position?.startedOn?.month ?? null,
-      currentStartYear: position?.startedOn?.year ?? null,
-    };
-  });
+      return {
+        firstName,
+        lastName,
+        pictureUrl,
+        currentTitle: position?.title ?? null,
+        currentStartMonth: position?.startedOn?.month ?? null,
+        currentStartYear: position?.startedOn?.year ?? null,
+      };
+    })
+    .filter((employee) => {
+      // Filter out employees without a start date (likely fake profiles)
+      return employee.currentStartMonth != null && employee.currentStartYear != null;
+    });
 }
 
 function resolveCurrentPositionForCompany(
