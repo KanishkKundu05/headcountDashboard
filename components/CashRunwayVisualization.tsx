@@ -83,9 +83,16 @@ export function CashRunwayVisualization() {
   // All conditional returns come AFTER all hooks
   if (!currentScenarioId) return null;
 
-  // Loading state
-  if (!scenarioWithEmployees) {
+  // Loading state - only show skeleton while query is loading (undefined)
+  // If query has resolved to null, the scenario doesn't exist - don't show skeleton
+  if (scenarioWithEmployees === undefined) {
     return <Skeleton className="h-[500px] w-full" />;
+  }
+
+  // Scenario doesn't exist or user doesn't have access - return null
+  // The dashboard layout will handle redirecting to a valid scenario
+  if (scenarioWithEmployees === null) {
+    return null;
   }
 
   const { startingCash, startingCashMonth, startingCashYear, employees } =

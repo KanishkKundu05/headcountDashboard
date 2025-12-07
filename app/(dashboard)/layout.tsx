@@ -2,7 +2,7 @@
 
 import { useConvexAuth, useQuery, useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, useRef } from "react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,7 +31,10 @@ function DashboardContent({
 }) {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const router = useRouter();
-  const { currentScenarioId } = useCurrentScenario();
+  const { currentScenarioId, setCurrentScenarioId } = useCurrentScenario();
+  
+  // Fetch all scenarios to validate current selection
+  const scenarios = useQuery(api.scenarios.getScenarios);
   const scenarioWithEmployees = useQuery(
     api.scenarios.getScenarioWithEmployees,
     currentScenarioId ? { id: currentScenarioId } : "skip"
@@ -44,12 +47,44 @@ function DashboardContent({
 
   // View mode state (shared via context)
   const [viewMode, setViewMode] = useState<ViewMode>("table");
+  
+  // Track if we've already validated the scenario to prevent infinite loops
+  const hasValidatedScenario = useRef(false);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push("/signup");
     }
   }, [isAuthenticated, isLoading, router]);
+
+  // Validate scenario ID from URL - clear if invalid and auto-select first valid one
+  useEffect(() => {
+    // Only validate once we have loaded scenarios and auth is complete
+    if (isLoading || !isAuthenticated || scenarios === undefined) return;
+    
+    // If there's a scenario ID in URL but query returned null (invalid/not owned by user)
+    // and we've loaded scenarios, clear the invalid ID
+    if (currentScenarioId && scenarioWithEmployees === null && !hasValidatedScenario.current) {
+      hasValidatedScenario.current = true;
+      
+      // Check if this ID exists in user's scenarios
+      const isValidScenario = scenarios.some(s => s._id === currentScenarioId);
+      
+      if (!isValidScenario) {
+        // Clear the invalid scenario ID and select first available one
+        if (scenarios.length > 0) {
+          setCurrentScenarioId(scenarios[0]._id);
+        } else {
+          setCurrentScenarioId(null);
+        }
+      }
+    }
+    
+    // Reset validation flag when scenario ID changes
+    if (!currentScenarioId) {
+      hasValidatedScenario.current = false;
+    }
+  }, [isLoading, isAuthenticated, currentScenarioId, scenarioWithEmployees, scenarios, setCurrentScenarioId]);
 
   const handleScenarioNameUpdate = async (newName: string) => {
     if (currentScenarioId && newName.trim()) {
@@ -62,21 +97,25 @@ function DashboardContent({
     async (template: RoleTemplate, targetMonth: string) => {
       if (!currentScenarioId) return;
 
-      const { year, month } = parseMonthString(targetMonth);
-      
-      // Create a new employee with the role template data
-      const employeeId = await createEmployee({
-        position: template.name,
-        salary: template.defaultSalary,
-        startMonth: month,
-        startYear: year,
-      });
+      try {
+        const { year, month } = parseMonthString(targetMonth);
+        
+        // Create a new employee with the role template data
+        const employeeId = await createEmployee({
+          position: template.name,
+          salary: template.defaultSalary,
+          startMonth: month,
+          startYear: year,
+        });
 
-      // Add to current scenario
-      await addEmployeeToScenario({
-        scenarioId: currentScenarioId,
-        employeeId,
-      });
+        // Add to current scenario
+        await addEmployeeToScenario({
+          scenarioId: currentScenarioId,
+          employeeId,
+        });
+      } catch (error) {
+        console.error("Failed to drop role:", error);
+      }
     },
     [currentScenarioId, createEmployee, addEmployeeToScenario]
   );

@@ -88,6 +88,7 @@ export function DataTableDemo() {
   const linkedinScrapes = useQuery(api.scenarios.getLinkedinScrapes)
 
   const createScenarioFromLinkedIn = useMutation(api.scenarios.createScenarioFromLinkedIn)
+  const createScenario = useMutation(api.scenarios.createScenario)
   const addEmployeesFromLinkedIn = useMutation(api.scenarios.addEmployeesFromLinkedIn)
   const addEmployeesToScenario = useMutation(api.scenarios.addEmployeesToScenario)
   const copyEmployeesFromScenario = useMutation(api.scenarios.copyEmployeesFromScenario)
@@ -106,14 +107,29 @@ export function DataTableDemo() {
   const [showLinkedInInput, setShowLinkedInInput] = React.useState(false)
   const { viewMode, setViewMode } = useViewMode()
 
-  // Auto-select first scenario if none selected
+  // Auto-select first scenario if none selected or if current selection is invalid
   React.useEffect(() => {
-    if (!currentScenarioId && scenarios && scenarios.length > 0) {
+    if (!scenarios) return // Still loading
+    
+    // If no scenario selected and we have scenarios, select first one
+    if (!currentScenarioId && scenarios.length > 0) {
       setCurrentScenarioId(scenarios[0]._id)
+      return
     }
-  }, [currentScenarioId, scenarios, setCurrentScenarioId])
+    
+    // If scenario is selected but query returned null (invalid/not owned), 
+    // and we've finished loading the query, clear and select first valid one
+    if (currentScenarioId && scenarioWithEmployees === null && scenarios.length > 0) {
+      // Verify the ID doesn't exist in user's scenarios
+      const isValidScenario = scenarios.some(s => s._id === currentScenarioId)
+      if (!isValidScenario) {
+        setCurrentScenarioId(scenarios[0]._id)
+      }
+    }
+  }, [currentScenarioId, scenarios, scenarioWithEmployees, setCurrentScenarioId])
 
   const employees: Employee[] = scenarioWithEmployees?.employees ?? []
+  // Loading only while queries are undefined (loading), not when they return null (no data/invalid)
   const loading = scenarios === undefined || (currentScenarioId && scenarioWithEmployees === undefined)
   const hasScenarios = scenarios && scenarios.length > 0
   const hasEmployees = employees.length > 0
@@ -241,16 +257,33 @@ export function DataTableDemo() {
 
   // Handle manually add employee
   const handleManuallyAddEmployee = async () => {
-    if (!currentScenarioId) return
+    let targetScenarioId = currentScenarioId
 
-    // Clear sorting to ensure the new employee (added to top) is visible at top
-    setSorting([])
-    
-    const employeeId = await createEmployee({})
-    await addEmployeeToScenario({
-      scenarioId: currentScenarioId,
-      employeeId,
-    })
+    // If no scenario exists, create one first
+    if (!targetScenarioId) {
+      try {
+        targetScenarioId = await createScenario({ name: "My Scenario" })
+        setCurrentScenarioId(targetScenarioId)
+      } catch (e) {
+        console.error("Failed to create scenario", e)
+        return
+      }
+    }
+
+    if (!targetScenarioId) return
+
+    try {
+      // Clear sorting to ensure the new employee (added to top) is visible at top
+      setSorting([])
+      
+      const employeeId = await createEmployee({})
+      await addEmployeeToScenario({
+        scenarioId: targetScenarioId,
+        employeeId,
+      })
+    } catch (error) {
+      console.error("Failed to add employee:", error)
+    }
   }
 
   const handleRemoveFromScenario = async (employeeId: Id<"employees">) => {
