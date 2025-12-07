@@ -22,7 +22,9 @@ function parseMonthString(monthStr: string): { year: number; month: number } {
   return { year, month };
 }
 
-export default function DashboardLayout({
+import { Suspense } from "react";
+
+function DashboardContent({
   children,
 }: {
   children: React.ReactNode;
@@ -194,5 +196,26 @@ export default function DashboardLayout({
         </SidebarProvider>
       </DndProvider>
     </ViewModeContext.Provider>
+  );
+}
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="space-y-4 w-full max-w-md p-8">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        </div>
+      }
+    >
+      <DashboardContent>{children}</DashboardContent>
+    </Suspense>
   );
 }
