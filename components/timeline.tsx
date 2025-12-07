@@ -1,31 +1,20 @@
 "use client";
 
 import * as React from "react";
-import { useDroppable, useDraggable } from "@dnd-kit/core";
+import { useDroppable } from "@dnd-kit/core";
 import { Id } from "@/convex/_generated/dataModel";
-import { useDndProviderContext, EmployeeDragData } from "@/components/dnd/dnd-context";
+import { useDndProviderContext } from "@/components/dnd/dnd-context";
 import { Button } from "@/components/ui/button";
+import { EmployeeBar, Employee, ROW_HEIGHT, parseMonthString } from "@/components/employeebars";
 
 // Constants
 const MONTH_WIDTH = 100; // px per month in quarterly view
 const YEAR_MONTH_WIDTH = 30; // px per month in yearly view
-const ROW_HEIGHT = 40; // px per employee row
 const HEADER_HEIGHT = 32; // px for month headers
+const SCROLL_BUFFER = 12; // months to load on each side
+const SCROLL_THRESHOLD = 200; // px from edge to trigger loading more
 
-// Employee type from Convex
-interface Employee {
-  _id: Id<"employees">;
-  firstName?: string;
-  lastName?: string;
-  pictureUrl?: string;
-  position?: string;
-  salary?: number;
-  startMonth?: number;
-  startYear?: number;
-  endMonth?: number;
-  endYear?: number;
-  linkedinUrl?: string;
-}
+type ViewMode = "quarterly" | "yearly";
 
 interface TimelineProps {
   employees: Employee[];
@@ -40,25 +29,47 @@ interface TimelineProps {
   ) => Promise<void>;
 }
 
-type ViewMode = "quarterly" | "yearly";
-
-// Helper to generate month array
-function generateMonths(startDate: Date, count: number): string[] {
+// Helper to generate month array from a start date
+function generateMonths(startYear: number, startMonth: number, count: number): string[] {
   const months: string[] = [];
-  const date = new Date(startDate);
+  let year = startYear;
+  let month = startMonth;
+  
   for (let i = 0; i < count; i++) {
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1; // 1-indexed
     months.push(`${year}-${month.toString().padStart(2, "0")}`);
-    date.setMonth(date.getMonth() + 1);
+    month++;
+    if (month > 12) {
+      month = 1;
+      year++;
+    }
   }
   return months;
 }
 
-// Parse month string to Date
-function parseMonthString(monthStr: string): { year: number; month: number } {
-  const [year, month] = monthStr.split("-").map(Number);
-  return { year, month };
+// Helper to subtract months from a date
+function subtractMonths(year: number, month: number, count: number): { year: number; month: number } {
+  let y = year;
+  let m = month - count;
+  
+  while (m < 1) {
+    m += 12;
+    y--;
+  }
+  
+  return { year: y, month: m };
+}
+
+// Helper to add months to a date
+function addMonths(year: number, month: number, count: number): { year: number; month: number } {
+  let y = year;
+  let m = month + count;
+  
+  while (m > 12) {
+    m -= 12;
+    y++;
+  }
+  
+  return { year: y, month: m };
 }
 
 // Format month for display
@@ -148,193 +159,125 @@ function MonthHeader({ month, viewMode }: { month: string; viewMode: ViewMode })
   );
 }
 
-// Draggable employee bar
-function EmployeeBar({
-  employee,
-  months,
-  viewMode,
-  rowIndex,
-}: {
-  employee: Employee;
-  months: string[];
-  viewMode: ViewMode;
-  rowIndex: number;
-}) {
-  const monthWidth = viewMode === "quarterly" ? MONTH_WIDTH : YEAR_MONTH_WIDTH;
-
-  // Calculate bar position and width
-  const startMonthStr = employee.startMonth && employee.startYear
-    ? `${employee.startYear}-${employee.startMonth.toString().padStart(2, "0")}`
-    : null;
-  const endMonthStr = employee.endMonth && employee.endYear
-    ? `${employee.endYear}-${employee.endMonth.toString().padStart(2, "0")}`
-    : null;
-
-  // Find start index
-  let startIndex = 0;
-  if (startMonthStr) {
-    const idx = months.indexOf(startMonthStr);
-    if (idx !== -1) {
-      startIndex = idx;
-    } else {
-      // Start is before visible range
-      const { year, month } = parseMonthString(startMonthStr);
-      const firstVisible = parseMonthString(months[0]);
-      if (year < firstVisible.year || (year === firstVisible.year && month < firstVisible.month)) {
-        startIndex = 0;
-      } else {
-        // Start is after visible range - don't show
-        return null;
-      }
-    }
-  }
-
-  // Find end index
-  let endIndex = months.length - 1;
-  if (endMonthStr) {
-    const idx = months.indexOf(endMonthStr);
-    if (idx !== -1) {
-      endIndex = idx;
-    } else {
-      // End is beyond visible range
-      const { year, month } = parseMonthString(endMonthStr);
-      const lastVisible = parseMonthString(months[months.length - 1]);
-      if (year > lastVisible.year || (year === lastVisible.year && month > lastVisible.month)) {
-        endIndex = months.length - 1;
-      } else {
-        // End is before visible range - don't show
-        return null;
-      }
-    }
-  }
-
-  // If start is after end, don't render
-  if (startIndex > endIndex) {
-    return null;
-  }
-
-  const left = startIndex * monthWidth;
-  const width = (endIndex - startIndex + 1) * monthWidth - 4; // -4 for padding
-
-  // Get display name
-  const displayName = employee.firstName || employee.lastName
-    ? `${employee.firstName || ""} ${employee.lastName || ""}`.trim()
-    : employee.position || "TBD";
-
-  // Determine bar color based on position
-  const isDesigner = employee.position?.toLowerCase().includes("design");
-  const barColor = isDesigner ? "#EC4899" : "#3B82F6";
-
-  // Drag data for moving the entire bar
-  const dragData: EmployeeDragData = {
-    type: "employee",
-    employeeId: employee._id,
-    action: "move",
-  };
-
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `employee-${employee._id}`,
-    data: dragData,
-  });
-
-  return (
-    <div
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      className={`
-        absolute rounded px-2 py-1 text-white text-xs font-medium
-        cursor-grab active:cursor-grabbing
-        flex items-center gap-1
-        transition-opacity duration-150
-        ${isDragging ? "opacity-50" : "opacity-100"}
-      `}
-      style={{
-        left: left + 2,
-        top: rowIndex * ROW_HEIGHT + 4,
-        width: Math.max(width, 60),
-        height: ROW_HEIGHT - 8,
-        backgroundColor: barColor,
-      }}
-    >
-      <span className="truncate">{displayName}</span>
-      
-      {/* Resize handles */}
-      <ResizeHandle
-        employeeId={employee._id}
-        edge="start"
-        position="left"
-      />
-      <ResizeHandle
-        employeeId={employee._id}
-        edge="end"
-        position="right"
-      />
-    </div>
-  );
-}
-
-// Resize handle for employee bars
-function ResizeHandle({
-  employeeId,
-  edge,
-  position,
-}: {
-  employeeId: Id<"employees">;
-  edge: "start" | "end";
-  position: "left" | "right";
-}) {
-  const dragData: EmployeeDragData = {
-    type: "employee",
-    employeeId,
-    action: edge === "start" ? "resize-start" : "resize-end",
-  };
-
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `resize-${edge}-${employeeId}`,
-    data: dragData,
-  });
-
-  return (
-    <div
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      className={`
-        absolute top-0 bottom-0 w-2 cursor-ew-resize
-        hover:bg-white/20 transition-colors
-        ${position === "left" ? "left-0" : "right-0"}
-        ${isDragging ? "bg-white/30" : ""}
-      `}
-      onClick={(e) => e.stopPropagation()}
-    />
-  );
-}
-
 export function Timeline({ employees, onUpdateEmployee }: TimelineProps) {
   const [viewMode, setViewMode] = React.useState<ViewMode>("quarterly");
   const { overId } = useDndProviderContext();
-
-  // Generate timeline months (starting from current month, going 24 months out)
-  const startDate = new Date();
-  startDate.setDate(1); // First of current month
-  const monthCount = viewMode === "quarterly" ? 18 : 24;
-  const months = React.useMemo(
-    () => generateMonths(startDate, monthCount),
-    [monthCount]
-  );
-
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  
+  // Current date as the anchor point
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1; // 1-indexed
+  
+  // State for the visible month range (offset from current month)
+  const [startOffset, setStartOffset] = React.useState(-SCROLL_BUFFER);
+  const [endOffset, setEndOffset] = React.useState(SCROLL_BUFFER * 2);
+  
+  // Track if we need to preserve scroll position after prepending months
+  const [pendingScrollAdjustment, setPendingScrollAdjustment] = React.useState(0);
+  
+  // Track the previously visible month for view mode changes
+  const [anchorMonth, setAnchorMonth] = React.useState<string | null>(null);
+  
+  // Generate months based on current offsets
+  const months = React.useMemo(() => {
+    const start = subtractMonths(currentYear, currentMonth, -startOffset);
+    const totalMonths = endOffset - startOffset;
+    return generateMonths(start.year, start.month, totalMonths);
+  }, [currentYear, currentMonth, startOffset, endOffset]);
+  
   const monthWidth = viewMode === "quarterly" ? MONTH_WIDTH : YEAR_MONTH_WIDTH;
   const totalWidth = months.length * monthWidth;
-
+  
+  // Index of the current month in the array
+  const currentMonthIndex = React.useMemo(() => {
+    const currentMonthStr = `${currentYear}-${currentMonth.toString().padStart(2, "0")}`;
+    return months.indexOf(currentMonthStr);
+  }, [months, currentYear, currentMonth]);
+  
+  // Scroll to current month on initial render
+  React.useEffect(() => {
+    if (scrollContainerRef.current && currentMonthIndex >= 0) {
+      const targetScroll = currentMonthIndex * monthWidth - 100; // 100px padding from left
+      scrollContainerRef.current.scrollLeft = Math.max(0, targetScroll);
+    }
+  }, []); // Only on mount
+  
+  // Handle scroll position adjustment after prepending months
+  React.useEffect(() => {
+    if (pendingScrollAdjustment !== 0 && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollLeft += pendingScrollAdjustment;
+      setPendingScrollAdjustment(0);
+    }
+  }, [pendingScrollAdjustment]);
+  
+  // Handle view mode change - preserve visible month
+  const handleViewModeChange = (newMode: ViewMode) => {
+    if (scrollContainerRef.current) {
+      // Calculate which month is currently at the center of the viewport
+      const container = scrollContainerRef.current;
+      const centerX = container.scrollLeft + container.clientWidth / 2;
+      const currentMonthWidth = viewMode === "quarterly" ? MONTH_WIDTH : YEAR_MONTH_WIDTH;
+      const centerMonthIndex = Math.floor(centerX / currentMonthWidth);
+      const centerMonth = months[Math.min(centerMonthIndex, months.length - 1)];
+      setAnchorMonth(centerMonth);
+    }
+    setViewMode(newMode);
+  };
+  
+  // Scroll to anchor month after view mode change
+  React.useEffect(() => {
+    if (anchorMonth && scrollContainerRef.current) {
+      const monthIndex = months.indexOf(anchorMonth);
+      if (monthIndex >= 0) {
+        const container = scrollContainerRef.current;
+        const targetScroll = monthIndex * monthWidth - container.clientWidth / 2;
+        container.scrollLeft = Math.max(0, targetScroll);
+      }
+      setAnchorMonth(null);
+    }
+  }, [viewMode, anchorMonth, months, monthWidth]);
+  
+  // Handle scroll to load more months
+  const handleScroll = React.useCallback(() => {
+    if (!scrollContainerRef.current) return;
+    
+    const container = scrollContainerRef.current;
+    const { scrollLeft, scrollWidth, clientWidth } = container;
+    
+    // Check if we're near the left edge
+    if (scrollLeft < SCROLL_THRESHOLD) {
+      const monthsToAdd = SCROLL_BUFFER;
+      const newStartOffset = startOffset - monthsToAdd;
+      const scrollAdjustment = monthsToAdd * monthWidth;
+      
+      setStartOffset(newStartOffset);
+      setPendingScrollAdjustment(scrollAdjustment);
+    }
+    
+    // Check if we're near the right edge
+    if (scrollWidth - scrollLeft - clientWidth < SCROLL_THRESHOLD) {
+      setEndOffset((prev) => prev + SCROLL_BUFFER);
+    }
+  }, [startOffset, monthWidth]);
+  
+  // Debounced scroll handler
+  const scrollTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const debouncedHandleScroll = React.useCallback(() => {
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+    scrollTimeoutRef.current = setTimeout(handleScroll, 100);
+  }, [handleScroll]);
+  
   // Filter employees that have dates in visible range
-  const visibleEmployees = employees.filter((emp) => {
+  const visibleEmployees = employees.filter(() => {
     // Show all employees for now, bar calculation handles visibility
     return true;
   });
 
   return (
-    <div className="border rounded-lg overflow-hidden bg-white">
+    <div className="border rounded-lg overflow-hidden bg-white w-full max-w-full">
       {/* Header with toggle */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
         <h3 className="font-semibold text-gray-900">Timeline</h3>
@@ -344,7 +287,7 @@ export function Timeline({ employees, onUpdateEmployee }: TimelineProps) {
               variant={viewMode === "quarterly" ? "default" : "ghost"}
               size="sm"
               className="rounded-none h-7 px-3"
-              onClick={() => setViewMode("quarterly")}
+              onClick={() => handleViewModeChange("quarterly")}
             >
               Quarterly
             </Button>
@@ -352,7 +295,7 @@ export function Timeline({ employees, onUpdateEmployee }: TimelineProps) {
               variant={viewMode === "yearly" ? "default" : "ghost"}
               size="sm"
               className="rounded-none h-7 px-3"
-              onClick={() => setViewMode("yearly")}
+              onClick={() => handleViewModeChange("yearly")}
             >
               Yearly
             </Button>
@@ -364,7 +307,11 @@ export function Timeline({ employees, onUpdateEmployee }: TimelineProps) {
       </div>
 
       {/* Timeline content */}
-      <div className="overflow-x-auto">
+      <div 
+        ref={scrollContainerRef}
+        className="overflow-x-auto w-full"
+        onScroll={debouncedHandleScroll}
+      >
         <div style={{ width: totalWidth, minWidth: "100%" }}>
           {/* Month headers */}
           <div className="flex border-b" style={{ height: HEADER_HEIGHT }}>
@@ -383,7 +330,7 @@ export function Timeline({ employees, onUpdateEmployee }: TimelineProps) {
           >
             {/* Droppable zones */}
             <div className="absolute inset-0 flex" style={{ top: 24 }}>
-              {months.map((month, idx) => (
+              {months.map((month) => (
                 <MonthDropZone
                   key={month}
                   month={month}
@@ -404,19 +351,20 @@ export function Timeline({ employees, onUpdateEmployee }: TimelineProps) {
                   key={employee._id}
                   employee={employee}
                   months={months}
-                  viewMode={viewMode}
+                  monthWidth={monthWidth}
                   rowIndex={idx}
                 />
               ))}
             </div>
 
             {/* Drop indicator */}
-            {overId && (
+            {overId && months.includes(overId as string) && (
               <div
                 className="absolute top-0 bottom-0 bg-blue-200/30 pointer-events-none"
                 style={{
                   left: months.indexOf(overId as string) * monthWidth,
                   width: monthWidth,
+                  top: 24,
                 }}
               />
             )}
@@ -426,7 +374,7 @@ export function Timeline({ employees, onUpdateEmployee }: TimelineProps) {
 
       {/* Empty state */}
       {visibleEmployees.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ top: HEADER_HEIGHT + 24 }}>
+        <div className="flex items-center justify-center py-16">
           <p className="text-sm text-gray-400">
             Drag a role from the sidebar to add employees
           </p>
