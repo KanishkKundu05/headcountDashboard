@@ -28,6 +28,10 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
     isDefault: v.optional(v.boolean()),
+    // Cash runway settings
+    startingCash: v.optional(v.number()),
+    startingCashMonth: v.optional(v.number()),
+    startingCashYear: v.optional(v.number()),
   }).index("by_user", ["userId"]),
 
   // Shared links - allow public read-only access to user's scenarios

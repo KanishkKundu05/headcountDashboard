@@ -390,3 +390,30 @@ export const copyEmployeesFromScenario = mutation({
     return args.targetScenarioId;
   },
 });
+
+// Update scenario financial settings (starting cash and date)
+export const updateScenarioFinancials = mutation({
+  args: {
+    id: v.id("scenarios"),
+    startingCash: v.optional(v.number()),
+    startingCashMonth: v.optional(v.number()),
+    startingCashYear: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const scenario = await ctx.db.get(args.id);
+    if (!scenario || scenario.userId !== userId) {
+      throw new Error("Scenario not found");
+    }
+
+    const { id, ...updates } = args;
+    await ctx.db.patch(id, {
+      ...updates,
+      updatedAt: Date.now(),
+    });
+
+    return args.id;
+  },
+});
