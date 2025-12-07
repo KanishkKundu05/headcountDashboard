@@ -27,6 +27,7 @@ interface RunwayChartProps {
   activeEmployeeCount?: number;
   useQuarterlyLabels?: boolean;
   showWarning?: boolean;
+  missingInputs?: boolean;
 }
 
 export function RunwayChart({
@@ -36,7 +37,18 @@ export function RunwayChart({
   activeEmployeeCount = 0,
   useQuarterlyLabels = false,
   showWarning = false,
+  missingInputs = false,
 }: RunwayChartProps) {
+  if (missingInputs) {
+    return (
+      <Card>
+        <CardContent className="flex min-h-[300px] flex-col items-center justify-center p-6 text-center text-muted-foreground">
+          <p>Configure starting cash and date</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   // For quarterly labels, filter to show only first month of each quarter
   const tickIndices = React.useMemo(() => {
     if (!useQuarterlyLabels || !data) {

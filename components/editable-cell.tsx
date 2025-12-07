@@ -130,7 +130,7 @@ export function EditableCell({
         <span
           ref={spanRef}
           className={cn(
-            "invisible absolute whitespace-pre px-2 text-sm",
+            "invisible absolute whitespace-pre px-2",
             className
           )}
           style={{ height: 0, overflow: "hidden" }}
@@ -149,7 +149,7 @@ export function EditableCell({
           placeholder={placeholder}
           style={{ width: inputWidth ? `${inputWidth}px` : "auto" }}
           className={cn(
-            "h-8 px-2 py-1 text-sm border-0 rounded shadow-none focus-visible:ring-0 bg-transparent hide-spinners",
+            "h-8 px-2 py-1 border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent hide-spinners p-0 m-0",
             className
           )}
         />
@@ -161,7 +161,7 @@ export function EditableCell({
     <div
       onClick={handleClick}
       className={cn(
-        "cursor-pointer rounded px-2 py-1 -mx-2 -my-1 hover:bg-muted/50 transition-colors min-h-[32px] flex items-center",
+        "cursor-pointer rounded px-2 py-1 -mx-2 -my-1 hover:bg-muted/50 transition-colors min-h-[32px] flex items-center border border-transparent hover:border-border",
         isEmpty && "text-muted-foreground italic",
         className
       )}

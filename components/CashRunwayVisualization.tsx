@@ -109,12 +109,13 @@ export function CashRunwayVisualization() {
       activeEmployeeCount={runwayData?.activeEmployeeCount}
       useQuarterlyLabels={runwayData?.useQuarterlyLabels}
       showWarning={showWarning}
+      missingInputs={!hasInputs}
     />
   );
 }
 
 // Export the update handler for use in sidebar
-export function useRunwaySettings(scenarioId: Id<"scenarios">) {
+export function useRunwaySettings(scenarioId: Id<"scenarios"> | null) {
   const updateScenarioFinancials = useMutation(
     api.scenarios.updateScenarioFinancials
   );
@@ -127,6 +128,8 @@ export function useRunwaySettings(scenarioId: Id<"scenarios">) {
       startingCashMonth: number | undefined,
       startingCashYear: number | undefined
     ) => {
+      if (!scenarioId) return;
+
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }

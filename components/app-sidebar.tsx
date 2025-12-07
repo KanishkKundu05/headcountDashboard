@@ -17,6 +17,7 @@ import {
   SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { NavUser } from "@/components/nav-user";
 import { ShareButton } from "@/components/share-button";
@@ -24,14 +25,19 @@ import { Plus, FileText, X } from "lucide-react";
 import { useCurrentScenario } from "@/hooks/use-current-scenario";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
 
 export function AppSidebar() {
   const scenarios = useQuery(api.scenarios.getScenarios);
   const currentUser = useQuery(api.users.currentUser);
   const { currentScenarioId, setCurrentScenarioId } = useCurrentScenario();
   const createScenario = useMutation(api.scenarios.createScenario);
+  const updateScenario = useMutation(api.scenarios.updateScenario);
   const deleteScenario = useMutation(api.scenarios.deleteScenario);
   const [isCreating, setIsCreating] = React.useState(false);
+
+  const [editingScenarioId, setEditingScenarioId] = React.useState<Id<"scenarios"> | null>(null);
+  const [editingName, setEditingName] = React.useState("");
 
   const loading = scenarios === undefined;
 
@@ -91,10 +97,36 @@ export function AppSidebar() {
     }
   };
 
+  const handleStartRenaming = (scenario: typeof scenarios[0]) => {
+    if (currentScenarioId === scenario._id) {
+      setEditingScenarioId(scenario._id);
+      setEditingName(scenario.name);
+    }
+  };
+
+  const handleRenameSave = async () => {
+    if (!editingScenarioId) return;
+    if (editingName.trim()) {
+      await updateScenario({ id: editingScenarioId, name: editingName.trim() });
+    }
+    setEditingScenarioId(null);
+  };
+
+  const handleRenameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleRenameSave();
+    } else if (e.key === "Escape") {
+      setEditingScenarioId(null);
+    }
+  };
+
   return (
     <Sidebar>
       <SidebarHeader>
-        <div className="px-2 py-4 font-semibold border-b text-lg">Headcount</div>
+        <div className="px-2 py-4 font-semibold border-b text-lg flex justify-between items-center">
+          Headcount Planner
+        </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -121,14 +153,31 @@ export function AppSidebar() {
               ) : scenarios && scenarios.length > 0 ? (
                 scenarios.map((scenario) => (
                   <SidebarMenuItem key={scenario._id}>
-                    <SidebarMenuButton
-                      isActive={currentScenarioId === scenario._id}
-                      onClick={() => setCurrentScenarioId(scenario._id)}
-                    >
-                      <FileText className="h-4 w-4" />
-                      <span>{scenario.name}</span>
-                    </SidebarMenuButton>
-                    {scenarios.length > 1 && (
+                    {editingScenarioId === scenario._id ? (
+                      <div className="px-2 py-1 relative">
+                        {/* Hidden span for width measurement */}
+                        <span className="invisible absolute whitespace-pre px-2 text-sm">{editingName || " "}</span>
+                        <Input
+                          value={editingName}
+                          onChange={(e) => setEditingName(e.target.value)}
+                          onBlur={handleRenameSave}
+                          onKeyDown={handleRenameKeyDown}
+                          autoFocus
+                          className="h-8 border-0 shadow-none focus-visible:ring-0 px-2 py-1 text-sm bg-transparent w-full"
+                        />
+                      </div>
+                    ) : (
+                      <SidebarMenuButton
+                        isActive={currentScenarioId === scenario._id}
+                        onClick={() => setCurrentScenarioId(scenario._id)}
+                        onDoubleClick={() => handleStartRenaming(scenario)}
+                        title="Double-click to rename"
+                      >
+                        <FileText className="h-4 w-4" />
+                        <span>{scenario.name}</span>
+                      </SidebarMenuButton>
+                    )}
+                    {scenarios.length > 1 && editingScenarioId !== scenario._id && (
                       <SidebarMenuAction
                         showOnHover
                         onClick={(e) => {

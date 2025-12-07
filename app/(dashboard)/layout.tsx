@@ -1,6 +1,6 @@
 "use client";
 
-import { useConvexAuth, useQuery } from "convex/react";
+import { useConvexAuth, useQuery, useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
@@ -10,6 +10,7 @@ import { RunwayInputs } from "@/components/RunwayInputs";
 import { useRunwaySettings } from "@/components/CashRunwayVisualization";
 import { useCurrentScenario } from "@/hooks/use-current-scenario";
 import { api } from "@/convex/_generated/api";
+import { EditableCell } from "@/components/editable-cell";
 
 export default function DashboardLayout({
   children,
@@ -23,15 +24,20 @@ export default function DashboardLayout({
     api.scenarios.getScenarioWithEmployees,
     currentScenarioId ? { id: currentScenarioId } : "skip"
   );
-  const handleRunwayUpdate = currentScenarioId
-    ? useRunwaySettings(currentScenarioId)
-    : () => {};
+  const handleRunwayUpdate = useRunwaySettings(currentScenarioId);
+  const updateScenario = useMutation(api.scenarios.updateScenario);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push("/signup");
     }
   }, [isAuthenticated, isLoading, router]);
+
+  const handleScenarioNameUpdate = async (newName: string) => {
+    if (currentScenarioId && newName.trim()) {
+      await updateScenario({ id: currentScenarioId, name: newName.trim() });
+    }
+  };
 
   // Show loading state while checking auth
   if (isLoading) {
@@ -57,6 +63,14 @@ export default function DashboardLayout({
         <header className="flex h-[4.25rem] items-center justify-between gap-4 border-b px-4">
           <div className="flex items-center gap-4">
             <SidebarTrigger />
+            {scenarioWithEmployees && (
+              <EditableCell
+                value={scenarioWithEmployees.name}
+                onSave={handleScenarioNameUpdate}
+                className="text-lg font-semibold"
+                placeholder="Scenario Name"
+              />
+            )}
           </div>
           <div className="ml-auto">
             <RunwayInputs
@@ -67,7 +81,7 @@ export default function DashboardLayout({
             />
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-6">
+        <div className="flex flex-1 flex-col gap-4 p-4">
           {children}
         </div>
       </SidebarInset>
