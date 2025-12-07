@@ -408,7 +408,7 @@ export function DataTableDemo() {
           className="pl-4"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
-          Salary
+          Salary (MO)
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
