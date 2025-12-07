@@ -16,7 +16,7 @@ import {
   useReactTable,
   VisibilityState,
 } from "@tanstack/react-table"
-import { ArrowUpDown, MoreHorizontal, Trash2, Plus, Copy, Link, ChevronDown } from "lucide-react"
+import { ArrowUpDown, MoreHorizontal, Trash2, Plus, Copy, Link, ChevronDown, Table2, CalendarRange } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -40,8 +40,10 @@ import {
 } from "@/components/ui/table"
 import { LinkedinCompanyInput } from "@/components/LinkedinCompanyInput"
 import { useCurrentScenario } from "@/hooks/use-current-scenario"
+import { useViewMode } from "@/hooks/use-view-mode"
 import { Skeleton } from "@/components/ui/skeleton"
 import { EditableCell } from "@/components/editable-cell"
+import { Timeline } from "@/components/timeline"
 
 // Employee type from Convex
 interface Employee {
@@ -102,6 +104,7 @@ export function DataTableDemo() {
   const [linkedInLoading, setLinkedInLoading] = React.useState(false)
   const [linkedInError, setLinkedInError] = React.useState<string | null>(null)
   const [showLinkedInInput, setShowLinkedInInput] = React.useState(false)
+  const { viewMode, setViewMode } = useViewMode()
 
   // Auto-select first scenario if none selected
   React.useEffect(() => {
@@ -336,6 +339,22 @@ export function DataTableDemo() {
     }
   }
 
+  // Handler for timeline date updates
+  const handleTimelineUpdate = async (
+    employeeId: Id<"employees">,
+    updates: {
+      startMonth?: number
+      startYear?: number
+      endMonth?: number
+      endYear?: number
+    }
+  ) => {
+    await updateEmployee({
+      id: employeeId,
+      ...updates,
+    })
+  }
+
   const columns: ColumnDef<Employee>[] = [
     {
       id: "select",
@@ -547,20 +566,45 @@ export function DataTableDemo() {
     <div className="w-full">
       {hasEmployees && (
         <div className="flex items-center justify-between py-4">
-          <Button onClick={handleManuallyAddEmployee}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Role/Employee
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button onClick={handleManuallyAddEmployee}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Role/Employee
+            </Button>
+            {/* View toggle */}
+            <div className="flex rounded-md overflow-hidden border">
+              <Button
+                variant={viewMode === "table" ? "default" : "ghost"}
+                size="sm"
+                className="rounded-none h-8 px-3"
+                onClick={() => setViewMode("table")}
+              >
+                <Table2 className="mr-1.5 h-4 w-4" />
+                Table
+              </Button>
+              <Button
+                variant={viewMode === "timeline" ? "default" : "ghost"}
+                size="sm"
+                className="rounded-none h-8 px-3"
+                onClick={() => setViewMode("timeline")}
+              >
+                <CalendarRange className="mr-1.5 h-4 w-4" />
+                Timeline
+              </Button>
+            </div>
+          </div>
           <div className="flex items-center space-x-2">
-            <Input
-              placeholder="Filter by name..."
-              value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
-              onChange={(event) =>
-                table.getColumn("name")?.setFilterValue(event.target.value)
-              }
-              className="max-w-sm w-[200px]"
-            />
-            {table.getFilteredSelectedRowModel().rows.length > 0 && (
+            {viewMode === "table" && (
+              <Input
+                placeholder="Filter by name..."
+                value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
+                onChange={(event) =>
+                  table.getColumn("name")?.setFilterValue(event.target.value)
+                }
+                className="max-w-sm w-[200px]"
+              />
+            )}
+            {viewMode === "table" && table.getFilteredSelectedRowModel().rows.length > 0 && (
               <Button
                 variant="outline"
                 size="sm"
@@ -580,199 +624,210 @@ export function DataTableDemo() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-md border">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
-                  </TableHead>
+      {/* Conditional rendering: Table or Timeline */}
+      {viewMode === "table" ? (
+        <>
+          <div className="overflow-hidden rounded-md border">
+            <Table>
+              <TableHeader>
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => (
+                      <TableHead key={header.id}>
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+                      </TableHead>
+                    ))}
+                  </TableRow>
                 ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
+              </TableHeader>
+              <TableBody>
+                {table.getRowModel().rows?.length ? (
+                  table.getRowModel().rows.map((row) => (
+                    <TableRow
+                      key={row.id}
+                      data-state={row.getIsSelected() && "selected"}
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id}>
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext()
+                          )}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={columns.length} className="h-64 align-middle">
+                      {isFirstTimeUser ? (
+                        // Layout A: First-time user - show LinkedIn input directly
+                        <div className="flex flex-col items-center justify-center gap-4 py-4">
+                          <div className="text-center space-y-1">
+                            <p className="text-sm text-muted-foreground">
+                              Import from LinkedIn or add employees manually
+                            </p>
+                          </div>
+                          <div className="w-full max-w-xl">
+                            <LinkedinCompanyInput
+                              onSubmit={handleLinkedInImportToScenario}
+                              loading={linkedInLoading}
+                            />
+                          </div>
+                          {linkedInError && (
+                            <p className="text-sm text-destructive">{linkedInError}</p>
+                          )}
+                          <div className="flex items-center gap-4 w-full max-w-xl">
+                            <div className="flex-1 h-px bg-border" />
+                            <span className="text-xs text-muted-foreground">or</span>
+                            <div className="flex-1 h-px bg-border" />
+                          </div>
+                          <Button variant="outline" onClick={handleManuallyAddEmployee}>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Manually add employee
+                          </Button>
+                        </div>
+                      ) : showLinkedInInput ? (
+                        // LinkedIn input expanded state
+                        <div className="flex flex-col items-center justify-center gap-4 py-4">
+                          <div className="w-full max-w-xl">
+                            <LinkedinCompanyInput
+                              onSubmit={handleLinkedInImportToScenario}
+                              loading={linkedInLoading}
+                            />
+                          </div>
+                          {linkedInError && (
+                            <p className="text-sm text-destructive">{linkedInError}</p>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowLinkedInInput(false)}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : (
+                        // Layout B: Returning user - show all options
+                        <div className="flex flex-col items-center justify-center gap-3 py-4">
+                          <p className="text-sm font-medium mb-2">No employees in this scenario</p>
+
+                          {/* Copy from scenario dropdown */}
+                          {hasOtherScenarios && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="outline" className="w-64">
+                                  <Copy className="mr-2 h-4 w-4" />
+                                  Copy from scenario
+                                  <ChevronDown className="ml-auto h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent className="w-64">
+                                <DropdownMenuLabel>Select scenario</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                {otherScenarios.map((scenario) => (
+                                  <DropdownMenuItem
+                                    key={scenario._id}
+                                    onClick={() => handleCopyFromScenario(scenario._id)}
+                                  >
+                                    {scenario.name}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+
+                          {/* Populate from scrape */}
+                          {hasScrapeHistory && linkedinScrapes && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="outline" className="w-64">
+                                  <Link className="mr-2 h-4 w-4" />
+                                  Populate from scrape
+                                  <ChevronDown className="ml-auto h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent className="w-64">
+                                <DropdownMenuLabel>Select scrape</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                {linkedinScrapes.map((scrape) => (
+                                  <DropdownMenuItem
+                                    key={scrape._id}
+                                    onClick={() => handlePopulateFromScrape(scrape._id)}
+                                  >
+                                    {scrape.companyName}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+
+                          {/* Scrape new LinkedIn URL */}
+                          <Button
+                            variant="outline"
+                            className="w-64"
+                            onClick={() => setShowLinkedInInput(true)}
+                          >
+                            <Link className="mr-2 h-4 w-4" />
+                            Scrape new LinkedIn URL
+                          </Button>
+
+                          {/* Manually add */}
+                          <Button
+                            variant="outline"
+                            className="w-64"
+                            onClick={handleManuallyAddEmployee}
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Manually add employee
+                          </Button>
+                        </div>
                       )}
                     </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-64 align-middle">
-                  {isFirstTimeUser ? (
-                    // Layout A: First-time user - show LinkedIn input directly
-                    <div className="flex flex-col items-center justify-center gap-4 py-4">
-                      <div className="text-center space-y-1">
-                        <p className="text-sm text-muted-foreground">
-                          Import from LinkedIn or add employees manually
-                        </p>
-                      </div>
-                      <div className="w-full max-w-xl">
-                        <LinkedinCompanyInput
-                          onSubmit={handleLinkedInImportToScenario}
-                          loading={linkedInLoading}
-                        />
-                      </div>
-                      {linkedInError && (
-                        <p className="text-sm text-destructive">{linkedInError}</p>
-                      )}
-                      <div className="flex items-center gap-4 w-full max-w-xl">
-                        <div className="flex-1 h-px bg-border" />
-                        <span className="text-xs text-muted-foreground">or</span>
-                        <div className="flex-1 h-px bg-border" />
-                      </div>
-                      <Button variant="outline" onClick={handleManuallyAddEmployee}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Manually add employee
-                      </Button>
-                    </div>
-                  ) : showLinkedInInput ? (
-                    // LinkedIn input expanded state
-                    <div className="flex flex-col items-center justify-center gap-4 py-4">
-                      <div className="w-full max-w-xl">
-                        <LinkedinCompanyInput
-                          onSubmit={handleLinkedInImportToScenario}
-                          loading={linkedInLoading}
-                        />
-                      </div>
-                      {linkedInError && (
-                        <p className="text-sm text-destructive">{linkedInError}</p>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowLinkedInInput(false)}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  ) : (
-                    // Layout B: Returning user - show all options
-                    <div className="flex flex-col items-center justify-center gap-3 py-4">
-                      <p className="text-sm font-medium mb-2">No employees in this scenario</p>
-
-                      {/* Copy from scenario dropdown */}
-                      {hasOtherScenarios && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="outline" className="w-64">
-                              <Copy className="mr-2 h-4 w-4" />
-                              Copy from scenario
-                              <ChevronDown className="ml-auto h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent className="w-64">
-                            <DropdownMenuLabel>Select scenario</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            {otherScenarios.map((scenario) => (
-                              <DropdownMenuItem
-                                key={scenario._id}
-                                onClick={() => handleCopyFromScenario(scenario._id)}
-                              >
-                                {scenario.name}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-
-                      {/* Populate from scrape */}
-                      {hasScrapeHistory && linkedinScrapes && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="outline" className="w-64">
-                              <Link className="mr-2 h-4 w-4" />
-                              Populate from scrape
-                              <ChevronDown className="ml-auto h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent className="w-64">
-                            <DropdownMenuLabel>Select scrape</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            {linkedinScrapes.map((scrape) => (
-                              <DropdownMenuItem
-                                key={scrape._id}
-                                onClick={() => handlePopulateFromScrape(scrape._id)}
-                              >
-                                {scrape.companyName}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-
-                      {/* Scrape new LinkedIn URL */}
-                      <Button
-                        variant="outline"
-                        className="w-64"
-                        onClick={() => setShowLinkedInInput(true)}
-                      >
-                        <Link className="mr-2 h-4 w-4" />
-                        Scrape new LinkedIn URL
-                      </Button>
-
-                      {/* Manually add */}
-                      <Button
-                        variant="outline"
-                        className="w-64"
-                        onClick={handleManuallyAddEmployee}
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        Manually add employee
-                      </Button>
-                    </div>
-                  )}
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {hasEmployees && (
-        <div className="flex items-center justify-end space-x-2 py-4">
-          <div className="text-muted-foreground flex-1 text-sm">
-            {table.getFilteredSelectedRowModel().rows.length} of{" "}
-            {table.getFilteredRowModel().rows.length} row(s) selected.
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
           </div>
-          <div className="space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
+
+          {hasEmployees && (
+            <div className="flex items-center justify-end space-x-2 py-4">
+              <div className="text-muted-foreground flex-1 text-sm">
+                {table.getFilteredSelectedRowModel().rows.length} of{" "}
+                {table.getFilteredRowModel().rows.length} row(s) selected.
+              </div>
+              <div className="space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => table.previousPage()}
+                  disabled={!table.getCanPreviousPage()}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => table.nextPage()}
+                  disabled={!table.getCanNextPage()}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        /* Timeline view */
+        <Timeline
+          employees={employees}
+          onUpdateEmployee={handleTimelineUpdate}
+        />
       )}
     </div>
   )
