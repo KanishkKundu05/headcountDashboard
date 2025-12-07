@@ -21,16 +21,55 @@ import {
 } from "@/components/ui/sidebar";
 import { NavUser } from "@/components/nav-user";
 import { ShareButton } from "@/components/share-button";
-import { Plus, FileText, X } from "lucide-react";
+import { Plus, FileText, X, GripVertical} from "lucide-react";
 import { useCurrentScenario } from "@/hooks/use-current-scenario";
+import { useViewMode } from "@/hooks/use-view-mode";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
+import { ROLE_TEMPLATES, RoleTemplate, formatCurrency } from "@/lib/role-templates";
+import { RoleDragData } from "@/components/dnd/dnd-context";
+import { useDraggable } from "@dnd-kit/core";
+
+// Draggable role item component
+function DraggableRoleItem({ template }: { template: RoleTemplate }) {
+  const dragData: RoleDragData = { type: "role", template };
+  
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `role-${template.id}`,
+    data: dragData,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      className={`
+        flex items-center justify-between gap-2 px-2 py-2 rounded-lg
+        cursor-grab active:cursor-grabbing
+        border border-transparent hover:border-sidebar-border
+        hover:bg-sidebar-accent transition-all duration-150
+        ${isDragging ? "opacity-50" : "opacity-100"}
+      `}
+    >
+      <div className="flex-1 min-w-0">
+        <div className="font-medium text-sm truncate">{template.name}</div>
+        <div className="text-xs text-muted-foreground">
+          {formatCurrency(template.defaultSalary)}/mo
+        </div>
+      </div>
+      <GripVertical className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+    </div>
+  );
+}
+
 
 export function AppSidebar() {
   const scenarios = useQuery(api.scenarios.getScenarios);
   const currentUser = useQuery(api.users.currentUser);
   const { currentScenarioId, setCurrentScenarioId } = useCurrentScenario();
+  const { viewMode } = useViewMode();
   const createScenario = useMutation(api.scenarios.createScenario);
   const updateScenario = useMutation(api.scenarios.updateScenario);
   const deleteScenario = useMutation(api.scenarios.deleteScenario);
@@ -97,7 +136,7 @@ export function AppSidebar() {
     }
   };
 
-  const handleStartRenaming = (scenario: typeof scenarios[0]) => {
+  const handleStartRenaming = (scenario: NonNullable<typeof scenarios>[number]) => {
     if (currentScenarioId === scenario._id) {
       setEditingScenarioId(scenario._id);
       setEditingName(scenario.name);
@@ -202,6 +241,19 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        {/* Roles section - draggable role templates (only visible in timeline view) */}
+        {viewMode === "timeline" && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Roles</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <div className="flex flex-col gap-1 px-1">
+                {ROLE_TEMPLATES.map((template) => (
+                  <DraggableRoleItem key={template.id} template={template} />
+                ))}
+              </div>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
       <SidebarFooter className="gap-2">
         <div className="px-2">
