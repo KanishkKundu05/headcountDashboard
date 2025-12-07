@@ -1,11 +1,15 @@
 "use client";
 
-import { useConvexAuth } from "convex/react";
+import { useConvexAuth, useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RunwayInputs } from "@/components/RunwayInputs";
+import { useRunwaySettings } from "@/components/CashRunwayVisualization";
+import { useCurrentScenario } from "@/hooks/use-current-scenario";
+import { api } from "@/convex/_generated/api";
 
 export default function DashboardLayout({
   children,
@@ -14,6 +18,14 @@ export default function DashboardLayout({
 }) {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const router = useRouter();
+  const { currentScenarioId } = useCurrentScenario();
+  const scenarioWithEmployees = useQuery(
+    api.scenarios.getScenarioWithEmployees,
+    currentScenarioId ? { id: currentScenarioId } : "skip"
+  );
+  const handleRunwayUpdate = currentScenarioId
+    ? useRunwaySettings(currentScenarioId)
+    : () => {};
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -42,9 +54,18 @@ export default function DashboardLayout({
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-[4.25rem] items-center gap-4 border-b px-4">
-          <SidebarTrigger />
-          <h1 className="text-lg font-semibold">Headcount</h1>
+        <header className="flex h-[4.25rem] items-center justify-between gap-4 border-b px-4">
+          <div className="flex items-center gap-4">
+            <SidebarTrigger />
+          </div>
+          <div className="ml-auto">
+            <RunwayInputs
+              startingCash={scenarioWithEmployees?.startingCash}
+              startingCashMonth={scenarioWithEmployees?.startingCashMonth}
+              startingCashYear={scenarioWithEmployees?.startingCashYear}
+              onUpdate={handleRunwayUpdate}
+            />
+          </div>
         </header>
         <div className="flex flex-1 flex-col gap-4 p-6">
           {children}
