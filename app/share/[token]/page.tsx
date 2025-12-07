@@ -2,7 +2,7 @@
 
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -14,6 +14,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FileText, Users } from "lucide-react";
+import { RunwayChart } from "@/components/RunwayChart";
+import {
+  calculateRunway,
+  validateRunwayInputs,
+  RunwayEmployee,
+} from "@/lib/runway-calculations";
+import { Id } from "@/convex/_generated/dataModel";
 
 interface Employee {
   _id: string;
@@ -29,6 +36,9 @@ interface Scenario {
   _id: string;
   name: string;
   employees: Employee[];
+  startingCash?: number;
+  startingCashMonth?: number;
+  startingCashYear?: number;
 }
 
 function formatSalary(salary?: number): string {
@@ -100,6 +110,54 @@ function ShareContent({ token }: { token: string }) {
   const activeScenarioId = selectedScenarioId ?? scenarios[0]?._id ?? null;
   const activeScenario = scenarios.find((s) => s._id === activeScenarioId);
 
+  // Calculate runway data for the active scenario
+  const runwayData = useMemo(() => {
+    if (!activeScenario) return null;
+
+    const { startingCash, startingCashMonth, startingCashYear, employees } =
+      activeScenario;
+
+    // Validate inputs
+    const validation = validateRunwayInputs(
+      startingCash,
+      startingCashMonth,
+      startingCashYear
+    );
+
+    if (!validation.valid) {
+      return null;
+    }
+
+    // Convert employees to RunwayEmployee format
+    const runwayEmployees: RunwayEmployee[] = employees.map((e) => ({
+      _id: e._id as Id<"employees">,
+      salary: e.salary,
+      startMonth: e.startMonth,
+      startYear: e.startYear,
+    }));
+
+    // Calculate runway
+    return calculateRunway(
+      startingCash!,
+      startingCashMonth!,
+      startingCashYear!,
+      runwayEmployees
+    );
+  }, [activeScenario]);
+
+  // Determine if financial inputs are configured
+  const hasFinancialInputs =
+    activeScenario?.startingCash !== undefined &&
+    activeScenario?.startingCashMonth !== undefined &&
+    activeScenario?.startingCashYear !== undefined;
+
+  // Show warning if inputs exist but no employees have valid data
+  const showWarning =
+    hasFinancialInputs &&
+    activeScenario &&
+    activeScenario.employees.length > 0 &&
+    runwayData?.activeEmployeeCount === 0;
+
   return (
     <div className="container mx-auto py-8">
       {/* Header */}
@@ -132,6 +190,21 @@ function ShareContent({ token }: { token: string }) {
               </span>
             </Button>
           ))}
+        </div>
+      )}
+
+      {/* Runway Chart */}
+      {activeScenario && activeScenario.employees.length > 0 && (
+        <div className="mb-6">
+          <RunwayChart
+            data={runwayData?.dataPoints}
+            monthsOfRunway={runwayData?.monthsOfRunway}
+            totalBurnRate={runwayData?.totalBurnRate}
+            activeEmployeeCount={runwayData?.activeEmployeeCount}
+            useQuarterlyLabels={runwayData?.useQuarterlyLabels}
+            showWarning={showWarning}
+            missingInputs={!hasFinancialInputs}
+          />
         </div>
       )}
 
