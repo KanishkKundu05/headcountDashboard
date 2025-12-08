@@ -2,6 +2,8 @@
 
 Interactive headcount planning tool for startups and finance teams, built with Next.js, Convex, TanStack Table, and shadcn/ui.
 
+https://headcount-dashboard-git-076edf-kanishk-kundus-projects-113a2546.vercel.app/
+
 ### Features
 
 - **Import team data from LinkedIn**
