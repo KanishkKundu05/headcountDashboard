@@ -80,6 +80,9 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
+              <FieldDescription>
+                Password must be at least 8 characters long.
+              </FieldDescription>
             </Field>
             {error && (
               <p className="text-sm text-destructive">{error}</p>
