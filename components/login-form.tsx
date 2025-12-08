@@ -56,18 +56,6 @@ export function LoginForm({
     }
   };
 
-  const handleGoogleLogin = async () => {
-    setError(null);
-    setLoading(true);
-
-    try {
-      await signIn("google");
-    } catch (err) {
-      setError("Google login failed. Please try again.");
-      setLoading(false);
-    }
-  };
-
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -106,14 +94,6 @@ export function LoginForm({
               <Field>
                 <Button type="submit" disabled={loading}>
                   {loading ? "Loading..." : "Login"}
-                </Button>
-                <Button
-                  variant="outline"
-                  type="button"
-                  onClick={handleGoogleLogin}
-                  disabled={loading}
-                >
-                  Login with Google
                 </Button>
                 <FieldDescription className="text-center">
                   Don&apos;t have an account? <a href="/signup">Sign up</a>

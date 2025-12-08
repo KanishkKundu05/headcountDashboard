@@ -52,18 +52,6 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
     }
   };
 
-  const handleGoogleSignup = async () => {
-    setError(null);
-    setLoading(true);
-
-    try {
-      await signIn("google");
-    } catch (err) {
-      setError("Google signup failed. Please try again.");
-      setLoading(false);
-    }
-  };
-
   return (
     <Card {...props}>
       <CardHeader>
@@ -91,11 +79,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={8}
               />
-              <FieldDescription>
-                Must be at least 8 characters long.
-              </FieldDescription>
             </Field>
             {error && (
               <p className="text-sm text-destructive">{error}</p>
@@ -104,14 +88,6 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
               <Field>
                 <Button type="submit" disabled={loading}>
                   {loading ? "Loading..." : "Create Account"}
-                </Button>
-                <Button
-                  variant="outline"
-                  type="button"
-                  onClick={handleGoogleSignup}
-                  disabled={loading}
-                >
-                  Sign up with Google
                 </Button>
                 <FieldDescription className="px-6 text-center">
                   Already have an account? <a href="/login">Sign in</a>
